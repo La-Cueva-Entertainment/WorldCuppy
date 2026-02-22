@@ -59,7 +59,7 @@ On startup the container runs `prisma migrate deploy` automatically. You can dis
 
 ### Publishing the image (GHCR)
 
-This repo includes a GitHub Actions workflow that builds and pushes the Docker image to GHCR on every push to `main`:
+This repo includes a GitHub Actions workflow that can build and push the Docker image to GHCR (manual run only):
 
 - Image: `ghcr.io/la-cueva-entertainment/worldcuppy:latest`
 
@@ -70,6 +70,15 @@ docker pull ghcr.io/la-cueva-entertainment/worldcuppy:latest
 ```
 
 If the package is private, you must `docker login ghcr.io` on Unraid using a GitHub token with `read:packages`.
+
+To avoid GitHub Actions minutes entirely, you can also build and push from any machine with Docker installed:
+
+```bash
+cd web
+docker login ghcr.io
+docker build -t ghcr.io/la-cueva-entertainment/worldcuppy:latest .
+docker push ghcr.io/la-cueva-entertainment/worldcuppy:latest
+```
 
 ### Production DB setup (recommended)
 

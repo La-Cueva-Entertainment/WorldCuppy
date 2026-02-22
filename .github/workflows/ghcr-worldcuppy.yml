@@ -1,8 +1,6 @@
 name: Build & Publish Docker (GHCR)
 
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
 
 permissions:
