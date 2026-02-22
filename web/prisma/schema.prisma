@@ -1,0 +1,176 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  activeLeagueId String?
+
+  accounts Account[]
+  sessions Session[]
+
+  leaguesCreated     League[]       @relation("LeaguesCreated")
+  leagueMemberships  LeagueMember[]
+  leagueInvitesCreated LeagueInvite[] @relation("LeagueInvitesCreated")
+  lineupPicks LineupPick[]
+
+  activeLeague League? @relation("ActiveLeague", fields: [activeLeagueId], references: [id], onDelete: SetNull)
+}
+
+model League {
+  id          String   @id @default(cuid())
+  name        String
+  createdAt   DateTime @default(now())
+  createdById String
+  deletedAt   DateTime?
+  buyInCents  Int      @default(4000)
+
+  createdBy User           @relation("LeaguesCreated", fields: [createdById], references: [id], onDelete: Restrict)
+  members   LeagueMember[]
+  invites   LeagueInvite[]
+  activeUsers User[]       @relation("ActiveLeague")
+  lineupPicks LineupPick[]
+  draft      LeagueDraft?
+
+  @@index([createdById])
+  @@index([deletedAt])
+}
+
+model LeagueDraft {
+  leagueId     String   @id
+  status       String   @default("pending")
+  orderUserIds String[]
+  currentPick  Int      @default(0)
+  rounds       Int      @default(8)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model LineupPick {
+  id        String   @id @default(cuid())
+  leagueId  String
+  userId    String
+  teamCode  String
+  price     Int
+  pickNumber Int?
+  createdAt DateTime @default(now())
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, userId, teamCode])
+  @@unique([leagueId, pickNumber])
+  @@index([leagueId, userId])
+  @@index([userId])
+  @@index([leagueId])
+}
+
+model LeagueInvite {
+  id          String   @id @default(cuid())
+  leagueId    String
+  email       String
+  token       String   @unique
+  createdAt   DateTime @default(now())
+  acceptedAt  DateTime?
+  createdById String
+
+  league    League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  createdBy User   @relation("LeagueInvitesCreated", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, email])
+  @@index([email])
+  @@index([leagueId])
+}
+
+model LeagueMember {
+  id        String   @id @default(cuid())
+  leagueId  String
+  userId    String
+  role      String   @default("member")
+  teamName  String?
+  createdAt DateTime @default(now())
+
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, userId])
+  @@index([userId])
+  @@index([leagueId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model TeamPoints {
+  teamCode  String   @id
+  points    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@index([points])
+}
+
+model TeamStagePoints {
+  teamCode  String
+  stageKey  String
+  points    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([teamCode, stageKey])
+  @@index([stageKey])
+}
