@@ -1,0 +1,2 @@
+# Ensure Linux-friendly line endings for container entrypoints
+*.sh text eol=lf

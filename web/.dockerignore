@@ -1,0 +1,9 @@
+node_modules
+.next
+.env
+.env.*
+Dockerfile
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
