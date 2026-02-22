@@ -1,10 +1,12 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-alpine AS deps
+FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 
-# Needed by Prisma/Node in alpine
-RUN apk add --no-cache openssl libc6-compat
+# Needed by Prisma/Node
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends openssl ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
 
 # Install deps (includes prisma generate via postinstall)
 COPY package.json package-lock.json ./
@@ -12,10 +14,12 @@ COPY prisma ./prisma
 RUN npm ci
 
 
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
-RUN apk add --no-cache openssl libc6-compat
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends openssl ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -24,10 +28,12 @@ ENV NODE_ENV=production
 RUN npm run build
 
 
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 
-RUN apk add --no-cache openssl libc6-compat
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends openssl ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 ENV PORT=3000
