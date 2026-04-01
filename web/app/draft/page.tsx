@@ -292,7 +292,7 @@ export default async function DraftPage({
           <form action={startDraftAction}>
             <input type="hidden" name="tournamentId" value={tournament.id} />
             <ConfirmSubmitButton
-              confirmMessage="Start the draft? This will reset any existing picks."
+              confirmText="Start the draft? This will reset any existing picks."
               className="inline-flex h-10 items-center rounded-xl bg-amber-500/20 px-5 text-sm font-semibold text-amber-300 ring-1 ring-amber-500/40 hover:bg-amber-500/30"
             >
               Start Draft
