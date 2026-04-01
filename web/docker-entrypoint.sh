@@ -11,11 +11,11 @@ if [ -z "${NEXTAUTH_SECRET:-}" ]; then
   echo "WARN: NEXTAUTH_SECRET is not set (recommended in production)" >&2
 fi
 
-# Wait for Postgres to be reachable
+# Wait for MariaDB to be reachable
 if [ "${SKIP_DB_WAIT:-0}" != "1" ]; then
   echo "Waiting for database..."
   node <<'NODE'
-const { Client } = require('pg');
+const mysql = require('mysql2/promise');
 
 const url = process.env.DATABASE_URL;
 const maxSeconds = Number.parseInt(process.env.DB_WAIT_SECONDS || '60', 10) || 60;
@@ -26,10 +26,9 @@ async function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 (async () => {
   while (true) {
     try {
-      const client = new Client({ connectionString: url });
-      await client.connect();
-      await client.query('select 1');
-      await client.end();
+      const conn = await mysql.createConnection(url);
+      await conn.query('SELECT 1');
+      await conn.end();
       process.exit(0);
     } catch (e) {
       if (Date.now() > deadline) {

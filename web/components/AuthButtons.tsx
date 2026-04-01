@@ -3,73 +3,41 @@
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 
-import { LeagueDropdown } from "@/components/LeagueDropdown";
-
-type LeagueOption = { id: string; name: string };
-
 export function AuthButtons({
   signedIn,
-  leagues,
-  activeLeagueId,
-  activeLeagueName,
   picksCount,
+  isAdmin,
 }: {
   signedIn: boolean;
-  leagues?: LeagueOption[];
-  activeLeagueId?: string | null;
-  activeLeagueName?: string | null;
   picksCount?: number | null;
+  isAdmin?: boolean;
 }) {
   if (signedIn) {
     return (
       <div className="flex items-center gap-2">
-        {typeof picksCount === "number" ? (
-          <div className="hidden items-center gap-2 text-xs text-zinc-200/90 md:flex">
-            <span>
-              <span className="font-semibold text-white">{picksCount}</span>/8 Teams
-            </span>
-          </div>
-        ) : null}
+        {typeof picksCount === "number" && (
+          <span className="hidden rounded-full bg-green-500/15 px-3 py-1 text-xs font-semibold text-green-300 ring-1 ring-green-500/30 md:inline">
+            {picksCount} picks
+          </span>
+        )}
 
-        <div className="hidden items-center gap-2 sm:flex">
-          <div className="text-xs font-medium text-zinc-200">League:</div>
-          {leagues && leagues.length > 1 ? (
-            <LeagueDropdown
-              leagues={leagues}
-              activeLeagueId={activeLeagueId}
-              className="h-9 max-w-[14rem] rounded-xl border border-white/15 bg-white/5 pl-3 pr-9 text-xs font-medium text-white outline-none hover:bg-white/10 disabled:opacity-60"
-            />
-          ) : (
-            <Link
-              href="/dashboard"
-              title="Go to dashboard"
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white ring-1 ring-inset ring-white/5 hover:bg-white/10"
-            >
-              {activeLeagueName ?? "—"}
-            </Link>
-          )}
-        </div>
-
+        {/* Mobile nav links */}
         <Link
-          href="/matchups"
-          className="inline-flex h-9 items-center rounded-xl bg-white/5 px-3 text-xs font-medium text-zinc-100 ring-1 ring-inset ring-white/10 hover:bg-white/10"
+          href="/dashboard"
+          className="inline-flex h-9 items-center rounded-xl bg-white/5 px-3 text-xs font-medium text-zinc-100 ring-1 ring-inset ring-white/10 hover:bg-white/10 md:hidden"
         >
-          Matchups
+          Standings
         </Link>
-        {activeLeagueId ? (
+
+        {isAdmin && (
           <Link
-            href={`/leagues/${activeLeagueId}/managers`}
-            className="inline-flex h-9 items-center rounded-xl bg-white/5 px-3 text-xs font-medium text-zinc-100 ring-1 ring-inset ring-white/10 hover:bg-white/10"
+            href="/admin"
+            className="inline-flex h-9 items-center rounded-xl bg-amber-400/10 px-3 text-xs font-medium text-amber-200 ring-1 ring-inset ring-amber-400/20 hover:bg-amber-400/15 md:hidden"
           >
-            Leaderboards
+            Admin
           </Link>
-        ) : null}
-        <Link
-          href="/lineup"
-          className="inline-flex h-9 items-center rounded-xl bg-white/5 px-3 text-xs font-medium text-zinc-100 ring-1 ring-inset ring-white/10 hover:bg-white/10"
-        >
-          My Lineup
-        </Link>
+        )}
+
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: "/" })}
@@ -85,7 +53,7 @@ export function AuthButtons({
     <div className="flex items-center gap-3">
       <Link
         href="/login"
-        className="text-sm font-medium text-zinc-200 hover:text-white"
+        className="inline-flex h-9 items-center rounded-xl bg-green-500/15 px-4 text-sm font-semibold text-green-300 ring-1 ring-green-500/30 hover:bg-green-500/20"
       >
         Sign in
       </Link>

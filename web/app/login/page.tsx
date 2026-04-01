@@ -59,7 +59,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-zinc-950/40 p-6 ring-1 ring-inset ring-white/5 backdrop-blur">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-6 ring-1 ring-inset ring-white/5 backdrop-blur">
           <form onSubmit={onSignInCredentials} className="grid gap-3">
             <label className="grid gap-1">
               <span className="text-sm font-medium text-zinc-200">Email</span>
@@ -68,7 +68,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
                 autoComplete="email"
-                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-emerald-500/40"
+                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-green-500/40"
                 required
               />
             </label>
@@ -79,7 +79,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 type="password"
                 autoComplete="current-password"
-                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-emerald-500/40"
+                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-green-500/40"
                 required
               />
             </label>
@@ -117,14 +117,14 @@ export default function LoginPage() {
           ) : null}
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-zinc-950/40 p-6 ring-1 ring-inset ring-white/5 backdrop-blur">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-6 ring-1 ring-inset ring-white/5 backdrop-blur">
           <h2 className="text-base font-semibold text-white">New here?</h2>
           <p className="mt-1 text-sm text-zinc-300">
             Create an account with email/password.
           </p>
           <Link
             href="/register"
-            className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500/20 px-4 py-2.5 text-sm font-medium text-emerald-50 ring-1 ring-inset ring-emerald-500/30 hover:bg-emerald-500/25"
+            className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-green-500/20 px-4 py-2.5 text-sm font-medium text-green-50 ring-1 ring-inset ring-green-500/30 hover:bg-green-500/25"
           >
             Create account
           </Link>

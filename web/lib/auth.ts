@@ -57,52 +57,7 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "database",
   },
-  events: {
-    async createUser({ user }) {
-      const email = user.email?.toLowerCase().trim();
-      if (!email) return;
-
-      const invites = await prisma.leagueInvite.findMany({
-        where: {
-          email,
-          acceptedAt: null,
-          league: { deletedAt: null },
-        },
-        select: { id: true, leagueId: true },
-      });
-
-      if (invites.length === 0) return;
-
-      await prisma.$transaction([
-        ...invites.map((inv) =>
-          prisma.leagueMember.upsert({
-            where: {
-              leagueId_userId: {
-                leagueId: inv.leagueId,
-                userId: user.id,
-              },
-            },
-            update: {},
-            create: {
-              leagueId: inv.leagueId,
-              userId: user.id,
-              role: "member",
-            },
-          })
-        ),
-        ...invites.map((inv) =>
-          prisma.leagueInvite.update({
-            where: { id: inv.id },
-            data: { acceptedAt: new Date() },
-          })
-        ),
-        prisma.user.updateMany({
-          where: { id: user.id, activeLeagueId: null },
-          data: { activeLeagueId: invites[0].leagueId },
-        }),
-      ]);
-    },
-  },
+  events: {},
   callbacks: {
     async session({ session, user }) {
       if (session.user) {

@@ -4,6 +4,16 @@ import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
+  // Block registration unless REGISTRATION_OPEN=true is set.
+  // For a private friend group you leave this unset and create accounts manually
+  // via the admin panel or by setting the env var temporarily.
+  if (process.env.REGISTRATION_OPEN !== "true") {
+    return NextResponse.json(
+      { error: "Registration is closed" },
+      { status: 403 }
+    );
+  }
+
   try {
     const body = (await request.json()) as {
       name?: string;
@@ -47,46 +57,6 @@ export async function POST(request: Request) {
       },
       select: { id: true, email: true, name: true },
     });
-
-    const invites = await prisma.leagueInvite.findMany({
-      where: {
-        email,
-        acceptedAt: null,
-        league: { deletedAt: null },
-      },
-      select: { id: true, leagueId: true },
-    });
-
-    if (invites.length > 0) {
-      await prisma.$transaction([
-        ...invites.map((inv) =>
-          prisma.leagueMember.upsert({
-            where: {
-              leagueId_userId: {
-                leagueId: inv.leagueId,
-                userId: user.id,
-              },
-            },
-            update: {},
-            create: {
-              leagueId: inv.leagueId,
-              userId: user.id,
-              role: "member",
-            },
-          })
-        ),
-        ...invites.map((inv) =>
-          prisma.leagueInvite.update({
-            where: { id: inv.id },
-            data: { acceptedAt: new Date() },
-          })
-        ),
-        prisma.user.updateMany({
-          where: { id: user.id, activeLeagueId: null },
-          data: { activeLeagueId: invites[0].leagueId },
-        }),
-      ]);
-    }
 
     return NextResponse.json({ user }, { status: 201 });
   } catch {

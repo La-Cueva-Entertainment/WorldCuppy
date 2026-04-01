@@ -48,11 +48,12 @@ export default function TieredTeamsBox({
   takenBy,
   canDraft,
   canPickNow,
-  activeLeagueId,
+  tournamentId,
   picksCount,
   lineupSize,
   draftTeamAction,
   showDraftControls = true,
+  extraFormFields,
 }: {
   tiers: TierData[];
   initialTierKey?: string;
@@ -61,11 +62,12 @@ export default function TieredTeamsBox({
   takenBy?: Record<string, TakenByInfo>;
   canDraft: boolean;
   canPickNow: boolean;
-  activeLeagueId?: string;
+  tournamentId?: string;
   picksCount: number;
   lineupSize: number;
   draftTeamAction?: (formData: FormData) => Promise<void>;
   showDraftControls?: boolean;
+  extraFormFields?: React.ReactNode;
 }) {
   const selectorRef = useRef<HTMLDivElement | null>(null);
   const suppressHoverTimeoutRef = useRef<number | null>(null);
@@ -201,7 +203,7 @@ export default function TieredTeamsBox({
               const canDraftThis = canDraft && canPickNow && !lineupFull && !taken;
 
               const canShowDraftButton =
-                showDraftControls && Boolean(draftTeamAction) && Boolean(activeLeagueId);
+                showDraftControls && Boolean(draftTeamAction) && Boolean(tournamentId);
 
               return (
                 <div
@@ -245,7 +247,7 @@ export default function TieredTeamsBox({
                       )
                     ) : canShowDraftButton ? (
                       <form action={draftTeamAction}>
-                        <input type="hidden" name="leagueId" value={activeLeagueId} />
+                        {extraFormFields}
                         <input type="hidden" name="teamCode" value={t.code} />
                         <input type="hidden" name="tier" value={tierForSubmit} />
                         <input type="hidden" name="returnTo" value={returnTo} />
@@ -309,7 +311,7 @@ export default function TieredTeamsBox({
                     const lineupFull = picksCount >= lineupSize;
                     const canDraftThis = canDraft && canPickNow && !lineupFull && !taken;
                     const canShowDraftButton =
-                      showDraftControls && Boolean(draftTeamAction) && Boolean(activeLeagueId);
+                      showDraftControls && Boolean(draftTeamAction) && Boolean(tournamentId);
 
                     return (
                       <div
@@ -376,7 +378,7 @@ export default function TieredTeamsBox({
                             )
                           ) : canShowDraftButton ? (
                             <form action={draftTeamAction} className="flex-1">
-                              <input type="hidden" name="leagueId" value={activeLeagueId} />
+                              {extraFormFields}
                               <input type="hidden" name="teamCode" value={t.code} />
                               <input type="hidden" name="tier" value={tierForSubmit} />
                               <input type="hidden" name="returnTo" value={returnTo} />
