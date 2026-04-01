@@ -7,8 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
 }
 
 model User {
@@ -44,7 +43,7 @@ model Tournament {
 model TournamentDraft {
   tournamentId String   @id
   status       String   @default("pending") // "pending" | "active" | "complete"
-  orderUserIds Json     @default("[]")
+  orderUserIds String[] @default([])
   currentPick  Int      @default(0)
   updatedAt    DateTime @updatedAt
 
