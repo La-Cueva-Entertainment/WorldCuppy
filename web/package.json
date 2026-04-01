@@ -6,7 +6,6 @@
     "dev": "next dev",
     "postinstall": "prisma generate",
     "sync:teams": "node scripts/sync-fifa-teams.mjs",
-    "clear:lineup": "node scripts/clear-lineup.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
