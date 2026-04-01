@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Image from "next/image";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import "./globals.css";
 
 import { AuthButtons } from "@/components/AuthButtons";
-import { SoccerFieldBanner } from "@/components/SoccerFieldBanner";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
@@ -73,48 +71,38 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        style={{ background: "var(--background)", color: "var(--foreground)" }}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-zinc-900`}
       >
-        <div className="relative min-h-screen">
-          {/* Ambient glow */}
-          <div className="pointer-events-none fixed inset-0 overflow-hidden">
-            <div className="absolute -top-40 left-1/2 h-96 w-[52rem] -translate-x-1/2 rounded-full bg-green-500/15 blur-3xl" />
-            <div className="absolute top-1/2 right-[-12rem] h-80 w-[42rem] rounded-full bg-amber-400/8 blur-3xl" />
-          </div>
-
+        <div className="min-h-screen">
           {/* Nav */}
-          <div className="relative overflow-hidden border-b border-white/10 bg-black/30 backdrop-blur-md">
-            <div className="pointer-events-none absolute inset-0">
-              <SoccerFieldBanner className="absolute inset-0 h-full w-full text-green-400 opacity-[0.07]" />
-            </div>
-            <div className="relative mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-3">
+          <div className="sticky top-0 z-30 bg-white shadow-sm">
+            <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-3">
               <Link
                 href="/"
                 aria-label="World Cuppy home"
-                className="flex items-center gap-2 rounded-full px-1 py-1 text-sm font-bold tracking-tight text-white hover:opacity-90"
+                className="flex items-center gap-2"
               >
-                <Image
-                  src="/world-cuppy-ball.png?v=2026"
-                  alt=""
-                  width={28}
-                  height={28}
-                  priority
-                  className="rounded-full ring-1 ring-white/20"
-                />
-                <span className="hidden sm:inline">World Cuppy</span>
+                <span className="text-2xl transition-transform duration-200 hover:rotate-12 hover:scale-110">
+                  ⚽
+                </span>
+                <span className="hidden bg-gradient-to-r from-emerald-600 to-emerald-400 bg-clip-text text-lg font-bold text-transparent sm:inline">
+                  World Cuppy
+                </span>
               </Link>
 
               {session && (
                 <nav className="hidden items-center gap-1 md:flex">
-                  <Link href="/dashboard" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-white/10 hover:text-white">
+                  <Link href="/dashboard" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
                     Standings
                   </Link>
-                  <Link href="/draft" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-200 hover:bg-white/10 hover:text-white">
+                  <Link href="/draft" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
                     Draft
                   </Link>
+                  <Link href="/preview" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
+                    Preview
+                  </Link>
                   {(isAdmin || siteOwner) && (
-                    <Link href="/admin" className="rounded-lg px-3 py-1.5 text-sm font-medium text-amber-300 hover:bg-amber-400/10 hover:text-amber-200">
+                    <Link href="/admin" className="rounded-lg px-3 py-1.5 text-sm font-medium text-amber-600 transition-colors hover:bg-amber-50 hover:text-amber-700">
                       Admin
                     </Link>
                   )}
@@ -127,10 +115,10 @@ export default async function RootLayout({
                 isAdmin={isAdmin || siteOwner}
               />
             </div>
-            <div className="h-0.5 bg-gradient-to-r from-green-400/60 via-yellow-300/40 to-transparent" />
+            <div className="h-0.5 bg-gradient-to-r from-emerald-500 to-emerald-400" />
           </div>
 
-          <div className="relative">{children}</div>
+          <div>{children}</div>
         </div>
       </body>
     </html>

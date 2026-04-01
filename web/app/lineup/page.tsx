@@ -68,19 +68,19 @@ export default async function LineupPage() {
     <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white">My Lineup</h1>
-          <p className="mt-1 text-sm text-zinc-400">{tournament.name} {tournament.year}</p>
+          <h1 className="text-2xl font-extrabold text-slate-900">My Lineup</h1>
+          <p className="mt-1 text-sm text-slate-500">{tournament.name} {tournament.year}</p>
         </div>
-        <div className="rounded-2xl border border-green-500/30 bg-green-500/10 px-4 py-2 text-right">
-          <div className="text-xs text-zinc-400">Total earned</div>
-          <div className="text-xl font-bold text-green-400">{formatDollars(totalEarned)}</div>
+        <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-2 text-right">
+          <div className="text-xs text-slate-500">Total earned</div>
+          <div className="text-xl font-bold text-green-700">{formatDollars(totalEarned)}</div>
         </div>
       </div>
 
       {myPicks.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
-          <p className="text-zinc-400">You haven't drafted any teams yet.</p>
-          <Link href="/draft" className="mt-3 inline-block text-sm text-green-400 hover:underline">Go to draft →</Link>
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <p className="text-slate-500">You haven't drafted any teams yet.</p>
+          <Link href="/draft" className="mt-3 inline-block text-sm text-green-600 hover:underline">Go to draft →</Link>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -91,16 +91,16 @@ export default async function LineupPage() {
             );
             const earned = totalEarningsCents(teamMatches, new Set([pick.teamCode]));
             return (
-              <div key={pick.teamCode} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div key={pick.teamCode} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-center gap-3">
                   <CountryFlag code={pick.teamCode} label={team?.name ?? pick.teamCode} className="h-8 w-11" />
                   <div className="flex-1">
-                    <div className="font-semibold text-white">{team?.name ?? pick.teamCode}</div>
-                    <div className="text-xs text-zinc-400">FIFA rank #{team?.rank} · Group {team?.group}</div>
+                    <div className="font-semibold text-slate-900">{team?.name ?? pick.teamCode}</div>
+                    <div className="text-xs text-slate-400">FIFA rank #{team?.rank} · Group {team?.group}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-zinc-500">earned</div>
-                    <div className="font-bold text-green-400">{formatDollars(earned)}</div>
+                    <div className="text-xs text-slate-400">earned</div>
+                    <div className="font-bold text-green-700">{formatDollars(earned)}</div>
                   </div>
                 </div>
               </div>
@@ -108,6 +108,30 @@ export default async function LineupPage() {
           })}
         </div>
       )}
+
+      {/* Payout cheat-sheet */}
+      <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-slate-400">How you earn</h2>
+        <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+          {[
+            { stage: "Group Win",   earn: "$3 + $0.25/gd" },
+            { stage: "Group Tie",   earn: "$1.00" },
+            { stage: "R16 Win",     earn: "$5 + $0.50/gd" },
+            { stage: "Quarter Final", earn: "$10 + $1/gd" },
+            { stage: "Semi Final",  earn: "$15 + $2/gd" },
+            { stage: "3rd Place",   earn: "$10 + $3/gd" },
+            { stage: "Runner-up",   earn: "$10 + $3/goal" },
+            { stage: "Champion",    earn: "$20 + $3/goal" },
+            { stage: "Odds 2-jump", earn: "+$1 bonus" },
+            { stage: "Odds 3-jump", earn: "+$2 bonus" },
+          ].map(({ stage, earn }) => (
+            <div key={stage} className="flex justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+              <span className="text-slate-600">{stage}</span>
+              <span className="font-semibold text-green-700">{earn}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </main>
   );
 }

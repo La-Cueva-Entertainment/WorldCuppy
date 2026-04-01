@@ -51,35 +51,35 @@ export default function LoginPage() {
     <div className="min-h-screen">
       <main className="mx-auto flex w-full max-w-lg flex-col gap-6 px-6 py-12">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
             Sign in
           </h1>
-          <p className="mt-1 text-sm text-zinc-300">
+          <p className="mt-1 text-sm text-zinc-500">
             Continue with Google, or use email/password.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-black/30 p-6 ring-1 ring-inset ring-white/5 backdrop-blur">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
           <form onSubmit={onSignInCredentials} className="grid gap-3">
             <label className="grid gap-1">
-              <span className="text-sm font-medium text-zinc-200">Email</span>
+              <span className="text-sm font-medium text-zinc-700">Email</span>
               <input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
                 autoComplete="email"
-                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-green-500/40"
+                className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                 required
               />
             </label>
             <label className="grid gap-1">
-              <span className="text-sm font-medium text-zinc-200">Password</span>
+              <span className="text-sm font-medium text-zinc-700">Password</span>
               <input
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 type="password"
                 autoComplete="current-password"
-                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-green-500/40"
+                className="h-11 rounded-xl border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                 required
               />
             </label>
@@ -87,44 +87,44 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={status.kind === "loading"}
-              className="mt-2 w-full rounded-xl bg-white/5 px-4 py-2.5 text-sm font-medium text-white ring-1 ring-inset ring-white/10 hover:bg-white/10 disabled:opacity-60"
+              className="mt-2 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
             >
               Sign in with email
             </button>
 
             {status.kind === "error" ? (
-              <p className="mt-2 text-sm text-red-400">{status.message}</p>
+              <p className="mt-2 text-sm text-red-600">{status.message}</p>
             ) : null}
           </form>
 
-          <div className="my-5 border-t border-white/10" />
+          <div className="my-5 border-t border-zinc-200" />
 
           <button
             type="button"
             disabled={googleState !== "enabled"}
             onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-            className="flex w-full items-center justify-center gap-3 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 ring-1 ring-inset ring-white/10 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <GoogleG className="h-5 w-5" />
             {googleState === "loading" ? "Checking Google…" : "Sign in with Google"}
           </button>
 
           {googleState === "disabled" ? (
-            <p className="mt-2 text-xs text-zinc-400">
+            <p className="mt-2 text-xs text-zinc-500">
               Google sign-in isn’t configured yet. Set GOOGLE_CLIENT_ID and
               GOOGLE_CLIENT_SECRET in .env and restart the dev server.
             </p>
           ) : null}
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-black/30 p-6 ring-1 ring-inset ring-white/5 backdrop-blur">
-          <h2 className="text-base font-semibold text-white">New here?</h2>
-          <p className="mt-1 text-sm text-zinc-300">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <h2 className="text-base font-semibold text-zinc-900">New here?</h2>
+          <p className="mt-1 text-sm text-zinc-500">
             Create an account with email/password.
           </p>
           <Link
             href="/register"
-            className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-green-500/20 px-4 py-2.5 text-sm font-medium text-green-50 ring-1 ring-inset ring-green-500/30 hover:bg-green-500/25"
+            className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
           >
             Create account
           </Link>

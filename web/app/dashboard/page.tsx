@@ -3,22 +3,23 @@ import { getServerSession } from "next-auth";
 import Link from "next/link";
 
 import { CountryFlag } from "@/components/CountryFlag";
+import { CountdownTimer } from "@/components/CountdownTimer";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
-import { totalEarningsCents, formatDollars, type MatchResult } from "@/lib/earnings";
+import { matchEarningsCents, totalEarningsCents, formatDollars, type MatchResult } from "@/lib/earnings";
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
 
 const PLAYER_COLORS = [
-  { bg: "bg-green-500/15", ring: "ring-green-500/40", text: "text-green-300", dot: "bg-green-400" },
-  { bg: "bg-amber-500/15", ring: "ring-amber-500/40", text: "text-amber-300", dot: "bg-amber-400" },
-  { bg: "bg-sky-500/15", ring: "ring-sky-500/40", text: "text-sky-300", dot: "bg-sky-400" },
-  { bg: "bg-rose-500/15", ring: "ring-rose-500/40", text: "text-rose-300", dot: "bg-rose-400" },
-  { bg: "bg-purple-500/15", ring: "ring-purple-500/40", text: "text-purple-300", dot: "bg-purple-400" },
-  { bg: "bg-orange-500/15", ring: "ring-orange-500/40", text: "text-orange-300", dot: "bg-orange-400" },
-  { bg: "bg-cyan-500/15", ring: "ring-cyan-500/40", text: "text-cyan-300", dot: "bg-cyan-400" },
-  { bg: "bg-fuchsia-500/15", ring: "ring-fuchsia-500/40", text: "text-fuchsia-300", dot: "bg-fuchsia-400" },
+  { bg: "bg-emerald-50", ring: "ring-emerald-300", text: "text-emerald-700", dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-800" },
+  { bg: "bg-amber-50", ring: "ring-amber-300", text: "text-amber-700", dot: "bg-amber-500", badge: "bg-amber-100 text-amber-800" },
+  { bg: "bg-sky-50", ring: "ring-sky-300", text: "text-sky-700", dot: "bg-sky-500", badge: "bg-sky-100 text-sky-800" },
+  { bg: "bg-rose-50", ring: "ring-rose-300", text: "text-rose-700", dot: "bg-rose-500", badge: "bg-rose-100 text-rose-800" },
+  { bg: "bg-purple-50", ring: "ring-purple-300", text: "text-purple-700", dot: "bg-purple-500", badge: "bg-purple-100 text-purple-800" },
+  { bg: "bg-orange-50", ring: "ring-orange-300", text: "text-orange-700", dot: "bg-orange-500", badge: "bg-orange-100 text-orange-800" },
+  { bg: "bg-cyan-50", ring: "ring-cyan-300", text: "text-cyan-700", dot: "bg-cyan-500", badge: "bg-cyan-100 text-cyan-800" },
+  { bg: "bg-fuchsia-50", ring: "ring-fuchsia-300", text: "text-fuchsia-700", dot: "bg-fuchsia-500", badge: "bg-fuchsia-100 text-fuchsia-800" },
 ];
 
 function colorFor(idx: number) {
@@ -49,9 +50,10 @@ export default async function DashboardPage() {
   if (!tournament) {
     return (
       <main className="mx-auto w-full max-w-4xl px-6 py-16 text-center">
+        <div className="mb-8"><CountdownTimer /></div>
         <div className="text-5xl mb-4">🔜</div>
-        <h1 className="text-2xl font-bold text-white">No active tournament yet</h1>
-        <p className="mt-2 text-zinc-400">An admin will set up the next tournament shortly.</p>
+        <h1 className="text-2xl font-bold text-slate-900">No active tournament yet</h1>
+        <p className="mt-2 text-slate-500">An admin will set up the next tournament shortly.</p>
       </main>
     );
   }
@@ -119,6 +121,47 @@ export default async function DashboardPage() {
     .map((uid, i) => ({ uid, earnings: earnings.get(uid) ?? 0, colorIdx: i }))
     .sort((a, b) => b.earnings - a.earnings);
 
+  // Today's matches
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+  const todayMatches = await prisma.match.findMany({
+    where: {
+      tournamentId: tournament.id,
+      matchDate: { gte: todayStart, lte: todayEnd },
+    },
+    orderBy: { matchDate: "asc" },
+    select: {
+      id: true, stage: true, groupName: true,
+      homeTeam: true, awayTeam: true,
+      homeScore: true, awayScore: true,
+      penaltyWinner: true, played: true, matchDate: true,
+    },
+  });
+
+  // Per-match payouts: matchId → { userId → cents }
+  type MatchPayouts = Map<string, Map<string, number>>;
+  const matchPayouts: MatchPayouts = new Map();
+  for (const m of todayMatches) {
+    const mr: MatchResult = {
+      stage: m.stage as MatchResult["stage"],
+      tournamentType: tournament.type as MatchResult["tournamentType"],
+      homeTeam: m.homeTeam,
+      awayTeam: m.awayTeam,
+      homeScore: m.homeScore ?? 0,
+      awayScore: m.awayScore ?? 0,
+      penaltyWinner: m.penaltyWinner ?? null,
+    };
+    const perPlayer = new Map<string, number>();
+    for (const uid of playerIds) {
+      const teams = teamsByPlayer.get(uid) ?? new Set<string>();
+      const cents = matchEarningsCents(mr, teams.has(m.homeTeam), teams.has(m.awayTeam));
+      if (cents > 0) perPlayer.set(uid, cents);
+    }
+    matchPayouts.set(m.id, perPlayer);
+  }
+
   // Bracket: group matches by stage
   const allMatches = await prisma.match.findMany({
     where: { tournamentId: tournament.id },
@@ -142,22 +185,106 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      {/* Countdown */}
+      <div className="mb-8">
+        <CountdownTimer />
+      </div>
+
       {/* Header */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-white">
+          <h1 className="text-3xl font-extrabold text-zinc-900">
             {tournament.name}{" "}
-            <span className="text-green-400">{tournament.year}</span>
+            <span className="text-emerald-600">{tournament.year}</span>
           </h1>
-          <p className="mt-1 text-sm text-zinc-400 capitalize">{tournament.status}</p>
+          <p className="mt-1 text-sm text-zinc-500 capitalize">{tournament.status}</p>
         </div>
         <Link
           href="/draft"
-          className="inline-flex h-10 items-center rounded-xl bg-green-500/20 px-5 text-sm font-semibold text-green-300 ring-1 ring-green-500/40 hover:bg-green-500/30"
+          className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700"
         >
           Go to Draft →
         </Link>
       </div>
+
+      {/* Today's Matches */}
+      {todayMatches.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">
+            Today&apos;s Matches
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {todayMatches.map((m) => {
+              const home = TEAMS_BY_CODE.get(m.homeTeam);
+              const away = TEAMS_BY_CODE.get(m.awayTeam);
+              const homeWon = m.played && ((m.homeScore ?? 0) > (m.awayScore ?? 0) || m.penaltyWinner === m.homeTeam);
+              const awayWon = m.played && ((m.awayScore ?? 0) > (m.homeScore ?? 0) || m.penaltyWinner === m.awayTeam);
+              const payouts = matchPayouts.get(m.id) ?? new Map<string, number>();
+              const kickoff = m.matchDate
+                ? new Date(m.matchDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                : null;
+              return (
+                <div key={m.id} className={`rounded-2xl border p-4 ${
+                  m.played ? "border-zinc-200 bg-white shadow-sm" : "border-zinc-100 bg-zinc-50"
+                }`}>
+                  {/* Meta row */}
+                  <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                    <span>{STAGE_LABELS[m.stage] ?? m.stage}{m.groupName ? ` · Grp ${m.groupName}` : ""}</span>
+                    {kickoff && !m.played && <span>{kickoff}</span>}
+                    {m.played && <span className="text-emerald-600">Final</span>}
+                  </div>
+
+                  {/* Teams + Score */}
+                  <div className="flex items-center gap-2">
+                    <div className={`flex min-w-0 flex-1 items-center gap-1.5 ${
+                      m.played && !homeWon ? "opacity-50" : ""
+                    }`}>
+                      <CountryFlag code={m.homeTeam} label={home?.name ?? m.homeTeam} className="h-5 w-7 shrink-0" />
+                      <span className="truncate text-sm font-semibold text-zinc-900">{home?.name ?? m.homeTeam}</span>
+                    </div>
+                    <div className="shrink-0 text-center">
+                      {m.played ? (
+                        <span className="font-mono text-base font-bold text-zinc-900">
+                          {m.homeScore}<span className="text-zinc-400"> – </span>{m.awayScore}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-400">vs</span>
+                      )}
+                      {m.penaltyWinner && (
+                        <div className="text-[10px] text-amber-600">pens</div>
+                      )}
+                    </div>
+                    <div className={`flex min-w-0 flex-1 flex-row-reverse items-center gap-1.5 ${
+                      m.played && !awayWon ? "opacity-50" : ""
+                    }`}>
+                      <CountryFlag code={m.awayTeam} label={away?.name ?? m.awayTeam} className="h-5 w-7 shrink-0" />
+                      <span className="truncate text-right text-sm font-semibold text-zinc-900">{away?.name ?? m.awayTeam}</span>
+                    </div>
+                  </div>
+
+                  {/* Payout badges */}
+                  {payouts.size > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5 border-t border-zinc-100 pt-3">
+                      {[...payouts.entries()].map(([uid, cents]) => {
+                        const u = userById.get(uid);
+                        const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
+                        const playerIdx = playerIds.indexOf(uid);
+                        const c = colorFor(playerIdx);
+                        return (
+                          <span key={uid} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${c.badge}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+                            {name} +{formatDollars(cents)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-[1fr_1.6fr]">
         {/* — Standings — */}
@@ -165,10 +292,10 @@ export default async function DashboardPage() {
           <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-zinc-500">
             Standings
           </h2>
-          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-xs text-zinc-500">
+                <tr className="border-b border-zinc-100 text-xs text-zinc-500">
                   <th className="py-3 pl-4 text-left font-medium">#</th>
                   <th className="py-3 text-left font-medium">Player</th>
                   <th className="py-3 pr-4 text-right font-medium">Earned</th>
@@ -180,23 +307,23 @@ export default async function DashboardPage() {
                   const user = userById.get(row.uid);
                   const teams = [...(teamsByPlayer.get(row.uid) ?? [])];
                   return (
-                    <tr key={row.uid} className="border-b border-white/5 hover:bg-white/5">
-                      <td className="py-3 pl-4 text-zinc-500 font-mono">{i + 1}</td>
+                    <tr key={row.uid} className="border-b border-zinc-50 hover:bg-zinc-50">
+                      <td className="py-3 pl-4 font-mono text-zinc-400">{i + 1}</td>
                       <td className="py-3">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <span className={`h-2.5 w-2.5 rounded-full ${c.dot}`} />
-                            <span className="font-semibold text-white">
+                            <span className="font-semibold text-zinc-900">
                               {user?.name ?? user?.email ?? row.uid.slice(0, 8)}
                             </span>
                           </div>
-                          <div className="flex flex-wrap gap-1 pl-4">
+                          <div className="grid grid-cols-3 gap-1 pl-4">
                             {teams.map((code) => {
                               const t = TEAMS_BY_CODE.get(code);
                               return (
-                                <span key={code} className="flex items-center gap-1 rounded-md bg-white/5 px-1.5 py-0.5 text-xs text-zinc-300">
-                                  <CountryFlag code={code} label={t?.name ?? code} className="h-3 w-4" />
-                                  {t?.name ?? code}
+                                <span key={code} className="flex min-w-0 items-center gap-1 overflow-hidden rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600">
+                                  <CountryFlag code={code} label={t?.name ?? code} className="h-3 w-4 shrink-0" />
+                                  <span className="truncate">{t?.name ?? code}</span>
                                 </span>
                               );
                             })}
@@ -211,7 +338,7 @@ export default async function DashboardPage() {
                 })}
                 {ranked.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-zinc-500">
+                    <td colSpan={3} className="py-8 text-center text-zinc-400">
                       No picks yet — go draft your teams!
                     </td>
                   </tr>
@@ -232,7 +359,7 @@ export default async function DashboardPage() {
               if (stageMatches.length === 0) return null;
               return (
                 <div key={stage}>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
                     {STAGE_LABELS[stage] ?? stage}
                   </h3>
                   <div className={`grid gap-2 ${stage === "group" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
@@ -256,25 +383,25 @@ export default async function DashboardPage() {
                           key={m.id}
                           className={`rounded-xl border px-4 py-3 ${
                             m.played
-                              ? "border-white/10 bg-white/5"
-                              : "border-white/5 bg-white/[0.02] opacity-70"
+                              ? "border-zinc-200 bg-white shadow-sm"
+                              : "border-zinc-100 bg-zinc-50 opacity-70"
                           }`}
                         >
                           {m.groupName && (
-                            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                               Group {m.groupName}
                             </div>
                           )}
                           <div className="flex items-center justify-between gap-2">
                             {/* Home */}
-                            <div className={`flex min-w-0 flex-1 items-center gap-2 ${homeWon ? "opacity-100" : "opacity-70"}`}>
+                            <div className={`flex min-w-0 flex-1 items-center gap-2 ${m.played && !homeWon ? "opacity-40" : ""}`}>
                               <CountryFlag code={m.homeTeam} label={home?.name ?? m.homeTeam} className="h-5 w-7 shrink-0" />
                               <div className="min-w-0">
-                                <div className={`truncate text-sm font-semibold ${homeWon ? "text-white" : "text-zinc-300"}`}>
+                                <div className="truncate text-sm font-semibold text-zinc-900">
                                   {home?.name ?? m.homeTeam}
                                 </div>
                                 {homeOwnerIds.length > 0 && (
-                                  <div className="truncate text-[10px] text-zinc-500">{getOwnerNames(homeOwnerIds)}</div>
+                                  <div className="truncate text-[10px] text-zinc-400">{getOwnerNames(homeOwnerIds)}</div>
                                 )}
                               </div>
                             </div>
@@ -283,27 +410,27 @@ export default async function DashboardPage() {
                             <div className="shrink-0 text-center">
                               {m.played ? (
                                 <div className="flex items-center gap-1.5 font-mono text-base font-bold">
-                                  <span className={homeWon ? "text-white" : "text-zinc-400"}>{m.homeScore}</span>
-                                  <span className="text-zinc-600">–</span>
-                                  <span className={awayWon ? "text-white" : "text-zinc-400"}>{m.awayScore}</span>
+                                  <span className={homeWon ? "text-zinc-900" : "text-zinc-400"}>{m.homeScore}</span>
+                                  <span className="text-zinc-300">–</span>
+                                  <span className={awayWon ? "text-zinc-900" : "text-zinc-400"}>{m.awayScore}</span>
                                 </div>
                               ) : (
-                                <span className="text-xs text-zinc-600">vs</span>
+                                <span className="text-xs text-zinc-400">vs</span>
                               )}
                               {m.penaltyWinner && (
-                                <div className="text-[10px] text-amber-400">pens</div>
+                                <div className="text-[10px] text-amber-600">pens</div>
                               )}
                             </div>
 
                             {/* Away */}
-                            <div className={`flex min-w-0 flex-1 flex-row-reverse items-center gap-2 text-right ${awayWon ? "opacity-100" : "opacity-70"}`}>
+                            <div className={`flex min-w-0 flex-1 flex-row-reverse items-center gap-2 text-right ${m.played && !awayWon ? "opacity-40" : ""}`}>
                               <CountryFlag code={m.awayTeam} label={away?.name ?? m.awayTeam} className="h-5 w-7 shrink-0" />
                               <div className="min-w-0">
-                                <div className={`truncate text-sm font-semibold ${awayWon ? "text-white" : "text-zinc-300"}`}>
+                                <div className="truncate text-sm font-semibold text-zinc-900">
                                   {away?.name ?? m.awayTeam}
                                 </div>
                                 {awayOwnerIds.length > 0 && (
-                                  <div className="truncate text-[10px] text-zinc-500">{getOwnerNames(awayOwnerIds)}</div>
+                                  <div className="truncate text-[10px] text-zinc-400">{getOwnerNames(awayOwnerIds)}</div>
                                 )}
                               </div>
                             </div>
