@@ -5,7 +5,8 @@ import { CountryFlag } from "@/components/CountryFlag";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
-import { totalEarningsCents, formatDollars, type MatchResult } from "@/lib/earnings";
+import { matchEarningsCents, totalEarningsCents, formatDollars, type MatchResult } from "@/lib/earnings";
+import { getTeamPlayers, POSITION_COLOR } from "@/lib/players";
 import Link from "next/link";
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
@@ -83,26 +84,76 @@ export default async function LineupPage() {
           <Link href="/draft" className="mt-3 inline-block text-sm text-green-600 hover:underline">Go to draft →</Link>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-4">
           {myPicks.map((pick) => {
             const team = TEAMS_BY_CODE.get(pick.teamCode);
+            const players = getTeamPlayers(pick.teamCode);
             const teamMatches = matchResults.filter(
               (m) => m.homeTeam === pick.teamCode || m.awayTeam === pick.teamCode,
             );
             const earned = totalEarningsCents(teamMatches, new Set([pick.teamCode]));
+
+            const matchBreakdown = teamMatches.map((m) => {
+              const ownsHome = m.homeTeam === pick.teamCode;
+              const oppCode = ownsHome ? m.awayTeam : m.homeTeam;
+              const oppTeam = TEAMS_BY_CODE.get(oppCode);
+              const myScore = ownsHome ? m.homeScore : m.awayScore;
+              const oppScore = ownsHome ? m.awayScore : m.homeScore;
+              const matchEarned = matchEarningsCents(m, ownsHome, !ownsHome);
+              const isWin = myScore > oppScore;
+              const isDraw = myScore === oppScore;
+              return { m, oppCode, oppTeam, myScore, oppScore, matchEarned, isWin, isDraw };
+            });
+
             return (
-              <div key={pick.teamCode} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <CountryFlag code={pick.teamCode} label={team?.name ?? pick.teamCode} className="h-8 w-11" />
-                  <div className="flex-1">
-                    <div className="font-semibold text-slate-900">{team?.name ?? pick.teamCode}</div>
-                    <div className="text-xs text-slate-400">FIFA rank #{team?.rank} · Group {team?.group}</div>
+              <div key={pick.teamCode} className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                {/* Team header */}
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+                  <CountryFlag code={pick.teamCode} label={team?.name ?? pick.teamCode} className="h-9 w-12 rounded-sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-slate-900 text-lg leading-tight">{team?.name ?? pick.teamCode}</div>
+                    <div className="text-xs text-slate-400">FIFA #{team?.rank} · Group {team?.group}</div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <div className="text-xs text-slate-400">earned</div>
-                    <div className="font-bold text-green-700">{formatDollars(earned)}</div>
+                    <div className={`text-xl font-bold ${earned > 0 ? "text-green-600" : "text-slate-400"}`}>{formatDollars(earned)}</div>
                   </div>
                 </div>
+
+                {/* Players */}
+                {players.length > 0 && (
+                  <div className="px-5 py-3 flex flex-wrap gap-2 border-b border-slate-100 bg-slate-50">
+                    {players.map((p) => (
+                      <span key={p.name} className="flex items-center gap-1.5 text-sm text-slate-700">
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${POSITION_COLOR[p.position]}`}>{p.position}</span>
+                        {p.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Match results */}
+                {matchBreakdown.length > 0 ? (
+                  <div className="divide-y divide-slate-100">
+                    {matchBreakdown.map(({ m, oppCode, oppTeam, myScore, oppScore, matchEarned, isWin, isDraw }, i) => (
+                      <div key={i} className="flex items-center gap-3 px-5 py-3">
+                        <span className="w-16 shrink-0 text-xs font-medium text-slate-400 uppercase tracking-wide">{STAGE_LABELS[m.stage] ?? m.stage}</span>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <CountryFlag code={oppCode} label={oppTeam?.name ?? oppCode} className="h-4 w-6 rounded-sm shrink-0" />
+                          <span className="text-sm text-slate-600 truncate">vs {oppTeam?.name ?? oppCode}</span>
+                        </div>
+                        <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${isWin ? "bg-green-50 text-green-700" : isDraw ? "bg-slate-100 text-slate-500" : "bg-red-50 text-red-600"}`}>
+                          {myScore}–{oppScore}
+                        </span>
+                        <span className={`shrink-0 text-sm font-semibold w-14 text-right ${matchEarned > 0 ? "text-green-600" : "text-slate-300"}`}>
+                          {matchEarned > 0 ? `+${formatDollars(matchEarned)}` : "—"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-5 py-3 text-sm text-slate-400">No matches played yet</div>
+                )}
               </div>
             );
           })}
