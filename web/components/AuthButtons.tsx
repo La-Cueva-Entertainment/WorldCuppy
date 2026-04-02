@@ -31,7 +31,7 @@ export function AuthButtons({
         {/* Mobile nav links */}
         <Link
           href="/dashboard"
-          className="inline-flex h-9 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 md:hidden"
+          className="inline-flex h-9 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/20 md:hidden"
         >
           Standings
         </Link>
@@ -39,7 +39,7 @@ export function AuthButtons({
         {isAdmin && (
           <Link
             href="/admin"
-            className="inline-flex h-9 items-center rounded-xl border border-amber-300 bg-amber-50 px-3 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 md:hidden"
+            className="inline-flex h-9 items-center rounded-xl border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-400/20 md:hidden"
           >
             Admin
           </Link>
@@ -48,7 +48,7 @@ export function AuthButtons({
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: "/" })}
-          className="inline-flex h-9 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
+          className="inline-flex h-9 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/20"
         >
           Sign Out
         </button>

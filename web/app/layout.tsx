@@ -76,7 +76,7 @@ export default async function RootLayout({
       >
         <div className="min-h-screen">
           {/* Nav */}
-          <div className="sticky top-0 z-30 bg-zinc-900">
+          <div className="sticky top-0 z-30 bg-zinc-900" style={{ backgroundColor: '#18181b' }}>
             <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-3">
               <Link
                 href="/"
