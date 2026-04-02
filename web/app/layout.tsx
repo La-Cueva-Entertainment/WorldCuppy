@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import Image from "next/image";
 import { getServerSession } from "next-auth";
 import "./globals.css";
 
 import { AuthButtons } from "@/components/AuthButtons";
-import { SoccerBallIcon } from "@/components/SoccerBallIcon";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
@@ -23,10 +23,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "World Cuppy",
   description: "International Fantasy Fútbol - Draft Nations",
-  icons: {
-    icon: "/worldcup.png",
-    apple: "/worldcup.png",
-  },
 };
 
 export default async function RootLayout({
@@ -87,7 +83,7 @@ export default async function RootLayout({
                 aria-label="World Cuppy home"
                 className="flex items-center gap-2"
               >
-                <SoccerBallIcon className="w-8 h-8 transition-transform duration-200 hover:rotate-12 hover:scale-110" />
+                <Image src="/wcball2.png" alt="" width={56} height={56} className="transition-transform duration-200 hover:rotate-12 hover:scale-110" />
                 <span className="hidden text-lg font-bold text-white sm:inline">
                   World <span className="text-yellow-400">Cuppy</span>
                 </span>
