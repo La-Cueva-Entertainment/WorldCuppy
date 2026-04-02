@@ -61,7 +61,7 @@ export default function RegisterPage() {
           </Link>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-zinc-950/40 p-6 ring-1 ring-inset ring-white/5 backdrop-blur">
+        <div className="rounded-2xl border border-white/10 bg-black/30 p-6 ring-1 ring-inset ring-white/5 backdrop-blur">
           <form onSubmit={onRegister} className="grid gap-3">
             <label className="grid gap-1">
               <span className="text-sm font-medium text-zinc-200">Name</span>
@@ -70,7 +70,7 @@ export default function RegisterPage() {
                 onChange={(e) => setName(e.target.value)}
                 type="text"
                 autoComplete="name"
-                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-emerald-500/40"
+                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-green-500/40"
               />
             </label>
             <label className="grid gap-1">
@@ -80,7 +80,7 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
                 autoComplete="email"
-                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-emerald-500/40"
+                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-green-500/40"
                 required
               />
             </label>
@@ -91,7 +91,7 @@ export default function RegisterPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 type="password"
                 autoComplete="new-password"
-                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-emerald-500/40"
+                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-green-500/40"
                 required
               />
             </label>
@@ -99,7 +99,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={status.kind === "loading"}
-              className="mt-2 w-full rounded-xl bg-emerald-500/20 px-4 py-2.5 text-sm font-medium text-emerald-50 ring-1 ring-inset ring-emerald-500/30 hover:bg-emerald-500/25 disabled:opacity-60"
+              className="mt-2 w-full rounded-xl bg-green-500/20 px-4 py-2.5 text-sm font-medium text-green-50 ring-1 ring-inset ring-green-500/30 hover:bg-green-500/25 disabled:opacity-60"
             >
               Create account
             </button>

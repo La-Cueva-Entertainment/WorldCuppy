@@ -6,20 +6,19 @@
     "dev": "next dev",
     "postinstall": "prisma generate",
     "sync:teams": "node scripts/sync-fifa-teams.mjs",
-    "clear:lineup": "node scripts/clear-lineup.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
-    "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
     "bcryptjs": "^3.0.3",
     "flag-icons": "^7.5.0",
+    "@prisma/adapter-pg": "^7.4.1",
+    "pg": "^8.13.3",
     "next": "16.1.6",
     "next-auth": "^4.24.13",
-    "pg": "^8.18.0",
     "prisma": "^7.4.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"
@@ -27,7 +26,6 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
-    "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

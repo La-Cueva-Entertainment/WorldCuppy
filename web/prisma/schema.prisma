@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -20,102 +17,91 @@ model User {
   emailVerified DateTime?
   image         String?
   passwordHash  String?
-  activeLeagueId String?
+  isAdmin       Boolean   @default(false)
 
-  accounts Account[]
-  sessions Session[]
-
-  leaguesCreated     League[]       @relation("LeaguesCreated")
-  leagueMemberships  LeagueMember[]
-  leagueInvitesCreated LeagueInvite[] @relation("LeagueInvitesCreated")
-  lineupPicks LineupPick[]
-
-  activeLeague League? @relation("ActiveLeague", fields: [activeLeagueId], references: [id], onDelete: SetNull)
+  accounts            Account[]
+  sessions            Session[]
+  lineupPicks         LineupPick[]
+  earningsAdjustments EarningsAdjustment[]
 }
 
-model League {
-  id          String   @id @default(cuid())
-  name        String
-  createdAt   DateTime @default(now())
-  createdById String
-  deletedAt   DateTime?
-  buyInCents  Int      @default(4000)
+model Tournament {
+  id             String   @id @default(cuid())
+  name           String
+  type           String   // "world_cup" | "euros"
+  year           Int
+  teamsPerPlayer Int      @default(4)
+  status         String   @default("upcoming") // "upcoming" | "draft" | "active" | "complete"
+  createdAt      DateTime @default(now())
 
-  createdBy User           @relation("LeaguesCreated", fields: [createdById], references: [id], onDelete: Restrict)
-  members   LeagueMember[]
-  invites   LeagueInvite[]
-  activeUsers User[]       @relation("ActiveLeague")
-  lineupPicks LineupPick[]
-  draft      LeagueDraft?
-
-  @@index([createdById])
-  @@index([deletedAt])
+  draft       TournamentDraft?
+  picks       LineupPick[]
+  matches     Match[]
+  adjustments EarningsAdjustment[]
 }
 
-model LeagueDraft {
-  leagueId     String   @id
-  status       String   @default("pending")
-  orderUserIds String[]
+model TournamentDraft {
+  tournamentId String   @id
+  status       String   @default("pending") // "pending" | "active" | "complete"
+  orderUserIds String[] @default([])
   currentPick  Int      @default(0)
-  rounds       Int      @default(8)
-  createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   @@index([status])
 }
 
 model LineupPick {
-  id        String   @id @default(cuid())
-  leagueId  String
-  userId    String
-  teamCode  String
-  price     Int
-  pickNumber Int?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  tournamentId String
+  userId       String
+  teamCode     String
+  draftOdds    Int?
+  pickNumber   Int?
+  createdAt    DateTime @default(now())
 
-  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([leagueId, userId, teamCode])
-  @@unique([leagueId, pickNumber])
-  @@index([leagueId, userId])
+  @@unique([tournamentId, userId, teamCode])
+  @@unique([tournamentId, pickNumber])
+  @@index([tournamentId, userId])
   @@index([userId])
-  @@index([leagueId])
+  @@index([tournamentId])
 }
 
-model LeagueInvite {
-  id          String   @id @default(cuid())
-  leagueId    String
-  email       String
-  token       String   @unique
-  createdAt   DateTime @default(now())
-  acceptedAt  DateTime?
-  createdById String
+model Match {
+  id            String    @id @default(cuid())
+  tournamentId  String
+  stage         String    // "group" | "r32" | "r16" | "qf" | "sf" | "3rd" | "final"
+  groupName     String?
+  homeTeam      String
+  awayTeam      String
+  homeScore     Int?
+  awayScore     Int?
+  penaltyWinner String?   // team code - set when knockout ends on pens
+  played        Boolean   @default(false)
+  matchDate     DateTime?
+  createdAt     DateTime  @default(now())
 
-  league    League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  createdBy User   @relation("LeagueInvitesCreated", fields: [createdById], references: [id], onDelete: Cascade)
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
-  @@unique([leagueId, email])
-  @@index([email])
-  @@index([leagueId])
+  @@index([tournamentId, stage])
 }
 
-model LeagueMember {
-  id        String   @id @default(cuid())
-  leagueId  String
-  userId    String
-  role      String   @default("member")
-  teamName  String?
-  createdAt DateTime @default(now())
+model EarningsAdjustment {
+  id           String   @id @default(cuid())
+  tournamentId String
+  userId       String
+  reason       String
+  amountCents  Int
+  createdAt    DateTime @default(now())
 
-  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([leagueId, userId])
-  @@index([userId])
-  @@index([leagueId])
+  @@index([tournamentId, userId])
 }
 
 model Account {

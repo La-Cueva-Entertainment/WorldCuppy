@@ -1,105 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-function clampInt(n: number) {
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.floor(n));
-}
-
 function formatSeconds(s: number) {
-  const sec = clampInt(s);
+  const sec = Math.max(0, Math.floor(s));
   const mm = Math.floor(sec / 60);
   const ss = sec % 60;
   return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
 }
 
-export function DraftPickTimer({
-  enabled,
-  leagueId,
-  pickSeconds,
-  pickStartedAtIso,
-  onTheClockLabel,
-  onTheClockIsBot,
-  tickDraftAction,
-}: {
-  enabled: boolean;
-  leagueId: string;
-  pickSeconds: number;
-  pickStartedAtIso: string;
-  onTheClockLabel: string | null;
-  onTheClockIsBot: boolean;
-  tickDraftAction: (formData: FormData) => Promise<void>;
-}) {
+export function DraftPickTimer({ seconds, key: _key }: { seconds: number; key?: number }) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  const lastFiredPickRef = useRef<string | null>(null);
-
-  const deadlineMs = useMemo(() => {
-    const start = Date.parse(pickStartedAtIso);
-    if (!Number.isFinite(start)) return null;
-    return start + clampInt(pickSeconds) * 1000;
-  }, [pickStartedAtIso, pickSeconds]);
-
-  const remainingSeconds = useMemo(() => {
-    if (!enabled || deadlineMs == null) return null;
-    const ms = deadlineMs - nowMs;
-    return Math.ceil(ms / 1000);
-  }, [deadlineMs, enabled, nowMs]);
+  const [remaining, setRemaining] = useState(seconds);
 
   useEffect(() => {
-    if (!enabled) return;
-    const t = window.setInterval(() => setNowMs(Date.now()), 250);
+    setRemaining(seconds);
+    const t = window.setInterval(() => {
+      setRemaining((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(t);
+          router.refresh();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
     return () => window.clearInterval(t);
-  }, [enabled]);
+  }, [seconds, router]);
 
-  useEffect(() => {
-    if (!enabled) return;
-    if (remainingSeconds == null) return;
-    if (isPending) return;
-
-    const shouldFire = onTheClockIsBot || remainingSeconds <= 0;
-    if (!shouldFire) return;
-
-    if (lastFiredPickRef.current === pickStartedAtIso) return;
-    lastFiredPickRef.current = pickStartedAtIso;
-
-    startTransition(async () => {
-      const fd = new FormData();
-      fd.set("leagueId", leagueId);
-      await tickDraftAction(fd);
-      router.refresh();
-    });
-  }, [enabled, isPending, leagueId, onTheClockIsBot, pickStartedAtIso, remainingSeconds, router, tickDraftAction]);
-
-  if (!enabled || remainingSeconds == null) return null;
-
-  const isOverdue = remainingSeconds <= 0;
-  const timeText = isOverdue ? "00:00" : formatSeconds(remainingSeconds);
+  const isLow = remaining <= 10;
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-zinc-400">Pick timer:</span>
-      <span
-        className={
-          "font-semibold " +
-          (isOverdue
-            ? "text-red-200"
-            : remainingSeconds <= 10
-              ? "text-amber-200"
-              : "text-emerald-100")
-        }
-        aria-label="Time remaining"
-        title="When the timer hits zero, the top available team is auto-picked."
-      >
-        {timeText}
-      </span>
-      {onTheClockLabel ? (
-        <span className="text-zinc-500">(On the clock: {onTheClockLabel})</span>
-      ) : null}
-      {isPending ? <span className="text-zinc-500">Auto-picking…</span> : null}
+    <div className="flex flex-col items-center">
+      <div className={`text-2xl font-mono font-bold tabular-nums ${
+        isLow ? "text-rose-400 animate-pulse" : "text-green-300"
+      }`}>
+        {formatSeconds(remaining)}
+      </div>
+      <div className="text-xs text-zinc-500">to pick</div>
     </div>
   );
 }

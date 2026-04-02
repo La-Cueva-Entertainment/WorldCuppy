@@ -1,6 +1,10 @@
 name: Build & Publish Docker (GHCR)
 
 on:
+  push:
+    branches:
+      - dev
+      - main
   workflow_dispatch:
 
 permissions:
@@ -34,7 +38,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/worldcuppy
           tags: |
-            type=raw,value=latest
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha
 
       - name: Build and push

@@ -3,77 +3,52 @@
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 
-import { LeagueDropdown } from "@/components/LeagueDropdown";
-
-type LeagueOption = { id: string; name: string };
-
 export function AuthButtons({
   signedIn,
-  leagues,
-  activeLeagueId,
-  activeLeagueName,
   picksCount,
+  isAdmin,
 }: {
   signedIn: boolean;
-  leagues?: LeagueOption[];
-  activeLeagueId?: string | null;
-  activeLeagueName?: string | null;
   picksCount?: number | null;
+  isAdmin?: boolean;
 }) {
   if (signedIn) {
     return (
       <div className="flex items-center gap-2">
-        {typeof picksCount === "number" ? (
-          <div className="hidden items-center gap-2 text-xs text-zinc-200/90 md:flex">
-            <span>
-              <span className="font-semibold text-white">{picksCount}</span>/8 Teams
-            </span>
-          </div>
-        ) : null}
+        {typeof picksCount === "number" && (
+          <span className="hidden rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 md:inline">
+            {picksCount} picks
+          </span>
+        )}
 
-        <div className="hidden items-center gap-2 sm:flex">
-          <div className="text-xs font-medium text-zinc-200">League:</div>
-          {leagues && leagues.length > 1 ? (
-            <LeagueDropdown
-              leagues={leagues}
-              activeLeagueId={activeLeagueId}
-              className="h-9 max-w-[14rem] rounded-xl border border-white/15 bg-white/5 pl-3 pr-9 text-xs font-medium text-white outline-none hover:bg-white/10 disabled:opacity-60"
-            />
-          ) : (
-            <Link
-              href="/dashboard"
-              title="Go to dashboard"
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white ring-1 ring-inset ring-white/5 hover:bg-white/10"
-            >
-              {activeLeagueName ?? "—"}
-            </Link>
-          )}
-        </div>
-
-        <Link
-          href="/matchups"
-          className="inline-flex h-9 items-center rounded-xl bg-white/5 px-3 text-xs font-medium text-zinc-100 ring-1 ring-inset ring-white/10 hover:bg-white/10"
-        >
-          Matchups
-        </Link>
-        {activeLeagueId ? (
-          <Link
-            href={`/leagues/${activeLeagueId}/managers`}
-            className="inline-flex h-9 items-center rounded-xl bg-white/5 px-3 text-xs font-medium text-zinc-100 ring-1 ring-inset ring-white/10 hover:bg-white/10"
-          >
-            Leaderboards
-          </Link>
-        ) : null}
         <Link
           href="/lineup"
-          className="inline-flex h-9 items-center rounded-xl bg-white/5 px-3 text-xs font-medium text-zinc-100 ring-1 ring-inset ring-white/10 hover:bg-white/10"
+          className="inline-flex h-9 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
         >
           My Lineup
         </Link>
+
+        {/* Mobile nav links */}
+        <Link
+          href="/dashboard"
+          className="inline-flex h-9 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 md:hidden"
+        >
+          Standings
+        </Link>
+
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className="inline-flex h-9 items-center rounded-xl border border-amber-300 bg-amber-50 px-3 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 md:hidden"
+          >
+            Admin
+          </Link>
+        )}
+
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: "/" })}
-          className="inline-flex h-9 items-center rounded-xl bg-white/5 px-3 text-xs font-medium text-zinc-100 ring-1 ring-inset ring-white/10 hover:bg-white/10"
+          className="inline-flex h-9 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
         >
           Sign Out
         </button>
@@ -85,7 +60,7 @@ export function AuthButtons({
     <div className="flex items-center gap-3">
       <Link
         href="/login"
-        className="text-sm font-medium text-zinc-200 hover:text-white"
+        className="inline-flex h-9 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
       >
         Sign in
       </Link>

@@ -1,189 +1,177 @@
-export type EarningsStageKey =
-  | "group_w1"
-  | "group_w2"
-  | "group_w3"
+/**
+ * Earnings engine — implements the friend-pool scoring rules:
+ *
+ * Group stage (per match):
+ *   Win +$3.00 | Tie +$1.00 | GD ×$0.25
+ *   Odds-jump bonuses: 2 spots jumped +$1, 3+ spots jumped +$2
+ *
+ * Round of 32 (WC only): Win +$5 | GD ×$0.50
+ * Round of 16: Win +$5 | GD ×$0.50  (Euros: same)
+ * Quarter Final: Win +$10 | GD ×$1.00
+ * Semi Final: Win +$15 | GD ×$2.00 (WC) / ×$1.00 (Euros)
+ * 3rd Place (WC): Win +$10 | GD ×$3.00
+ * 2nd Place (Runner-up): +$10 | Goals ×$3.00
+ * Winner: +$20 | Goals ×$3.00
+ *
+ * All amounts in cents internally ($1.00 = 100 cents).
+ */
+
+export type TournamentType = "world_cup" | "euros";
+
+export type Stage =
+  | "group"
   | "r32"
-  | "r16";
+  | "r16"
+  | "qf"
+  | "sf"
+  | "3rd"
+  | "final";
 
-export type UserStagePoints = Record<EarningsStageKey, number> & {
-  overallPoints: number;
+export type MatchResult = {
+  stage: Stage;
+  tournamentType: TournamentType;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+  /** Team code that won on penalties (knockout rounds drawn after 90+ET) */
+  penaltyWinner?: string | null;
 };
 
-type PayoutLine = {
-  userId: string;
-  cents: number;
+export type OddsJumpInput = {
+  teamCode: string;
+  /** Pre-tournament odds (American format, e.g. 350 or -225) */
+  draftOdds: number;
+  /** Odds at start of the round (for jump calculation) */
+  currentOdds: number;
 };
 
-function clampNonNegativeInt(n: number) {
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.floor(n));
-}
+/**
+ * Returns earnings in cents for one player owning one team in one match.
+ * Pass `ownsHome` / `ownsAway` separately and call twice if player owns both.
+ */
+export function matchEarningsCents(
+  result: MatchResult,
+  ownsHome: boolean,
+  ownsAway: boolean,
+): number {
+  if (!ownsHome && !ownsAway) return 0;
 
-function distributeProRataCents(
-  poolCents: number,
-  pointsByUser: Array<{ userId: string; points: number }>,
-): PayoutLine[] {
-  const pool = clampNonNegativeInt(poolCents);
-  if (pool === 0) return pointsByUser.map((p) => ({ userId: p.userId, cents: 0 }));
+  const { stage, tournamentType, homeScore, awayScore, penaltyWinner } = result;
+  const homeWon = homeScore > awayScore;
+  const awayWon = awayScore > homeScore;
+  const draw = homeScore === awayScore;
+  const gd = Math.abs(homeScore - awayScore);
 
-  const totalPoints = pointsByUser.reduce(
-    (sum, p) => sum + clampNonNegativeInt(p.points),
-    0,
-  );
-  if (totalPoints <= 0) {
-    return pointsByUser.map((p) => ({ userId: p.userId, cents: 0 }));
-  }
+  let total = 0;
 
-  const raw = pointsByUser.map((p) => {
-    const pts = clampNonNegativeInt(p.points);
-    const exact = (pool * pts) / totalPoints;
-    const floor = Math.floor(exact);
-    return {
-      userId: p.userId,
-      floor,
-      frac: exact - floor,
-    };
-  });
+  function earnFor(ownsThisTeam: boolean, thisTeamWon: boolean, thisTeamGoals: number) {
+    if (!ownsThisTeam) return;
 
-  let paid = raw.reduce((sum, r) => sum + r.floor, 0);
-  let remainder = pool - paid;
-
-  raw.sort((a, b) => b.frac - a.frac || a.userId.localeCompare(b.userId));
-  for (let i = 0; i < raw.length && remainder > 0; i += 1) {
-    raw[i].floor += 1;
-    remainder -= 1;
-  }
-
-  const out = raw.map((r) => ({ userId: r.userId, cents: r.floor }));
-  out.sort((a, b) => a.userId.localeCompare(b.userId));
-  return out;
-}
-
-function splitEvenlyCents(poolCents: number, userIds: string[]): PayoutLine[] {
-  const pool = clampNonNegativeInt(poolCents);
-  if (!userIds.length) return [];
-
-  const base = Math.floor(pool / userIds.length);
-  let remainder = pool - base * userIds.length;
-
-  const sorted = userIds.slice().sort();
-  return sorted.map((userId, idx) => {
-    const extra = remainder > 0 ? 1 : 0;
-    if (remainder > 0) remainder -= 1;
-    return { userId, cents: base + extra };
-  });
-}
-
-export function calculateLeagueEarnings({
-  buyInCents,
-  memberUserIds,
-  pointsByUserId,
-}: {
-  buyInCents: number;
-  memberUserIds: string[];
-  pointsByUserId: Record<string, UserStagePoints>;
-}) {
-  const buyIn = clampNonNegativeInt(buyInCents);
-  const members = memberUserIds.slice();
-
-  const totalPot = buyIn * members.length;
-  const groupPool = Math.floor(totalPot * 0.25);
-  const r32Pool = Math.floor(totalPot * 0.15);
-  const r16Pool = Math.floor(totalPot * 0.1);
-  const remainingPool = totalPot - groupPool - r32Pool - r16Pool;
-
-  const w1Pool = Math.floor(groupPool / 3);
-  const w2Pool = Math.floor(groupPool / 3);
-  const w3Pool = groupPool - w1Pool - w2Pool;
-
-  const stagePools: Array<{ stage: EarningsStageKey; pool: number }> = [
-    { stage: "group_w1", pool: w1Pool },
-    { stage: "group_w2", pool: w2Pool },
-    { stage: "group_w3", pool: w3Pool },
-    { stage: "r32", pool: r32Pool },
-    { stage: "r16", pool: r16Pool },
-  ];
-
-  const earnedByUser: Record<string, number> = {};
-  for (const userId of members) earnedByUser[userId] = 0;
-
-  const earnedByUserByStage: Record<EarningsStageKey, Record<string, number>> = {
-    group_w1: {},
-    group_w2: {},
-    group_w3: {},
-    r32: {},
-    r16: {},
-  };
-  for (const stage of Object.keys(earnedByUserByStage) as EarningsStageKey[]) {
-    for (const userId of members) earnedByUserByStage[stage][userId] = 0;
-  }
-
-  for (const { stage, pool } of stagePools) {
-    const pointsRows = members.map((userId) => ({
-      userId,
-      points: pointsByUserId[userId]?.[stage] ?? 0,
-    }));
-
-    const payouts = distributeProRataCents(pool, pointsRows);
-    for (const p of payouts) {
-      earnedByUser[p.userId] = (earnedByUser[p.userId] ?? 0) + p.cents;
-      earnedByUserByStage[stage][p.userId] =
-        (earnedByUserByStage[stage][p.userId] ?? 0) + p.cents;
+    switch (stage) {
+      case "group": {
+        if (thisTeamWon) total += 300 + gd * 25;
+        else if (draw) total += 100;
+        break;
+      }
+      case "r32":
+      case "r16": {
+        const winner = penaltyWinner
+          ? penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam)
+          : thisTeamWon;
+        if (winner) total += 500 + gd * 50;
+        break;
+      }
+      case "qf": {
+        const winner = penaltyWinner
+          ? penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam)
+          : thisTeamWon;
+        if (winner) total += 1000 + gd * 100;
+        break;
+      }
+      case "sf": {
+        const winner = penaltyWinner
+          ? penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam)
+          : thisTeamWon;
+        const gdBonus = tournamentType === "world_cup" ? 200 : 100;
+        if (winner) total += 1500 + gd * gdBonus;
+        break;
+      }
+      case "3rd": {
+        if (tournamentType !== "world_cup") break;
+        const winner = penaltyWinner
+          ? penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam)
+          : thisTeamWon;
+        if (winner) total += 1000 + gd * 300;
+        break;
+      }
+      case "final": {
+        if (thisTeamWon || (penaltyWinner && penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam))) {
+          // Winner
+          total += 2000 + thisTeamGoals * 300;
+        } else {
+          // Runner-up
+          total += 1000 + thisTeamGoals * 300;
+        }
+        break;
+      }
     }
   }
 
-  // Remaining pool: 1st gets 80%, 2nd gets 20% (ties split).
-  const overall = members.map((userId) => ({
-    userId,
-    points: pointsByUserId[userId]?.overallPoints ?? 0,
-  }));
-  const maxPoints = Math.max(0, ...overall.map((o) => clampNonNegativeInt(o.points)));
-  const firstGroup = overall
-    .filter((o) => clampNonNegativeInt(o.points) === maxPoints)
-    .map((o) => o.userId);
+  earnFor(ownsHome, homeWon, homeScore);
+  earnFor(ownsAway, awayWon, awayScore);
 
-  if (firstGroup.length > 1) {
-    const payouts = splitEvenlyCents(remainingPool, firstGroup);
-    for (const p of payouts) earnedByUser[p.userId] = (earnedByUser[p.userId] ?? 0) + p.cents;
-  } else {
-    const winnerId = firstGroup[0] ?? null;
-    const others = overall.filter((o) => o.userId !== winnerId);
-    const secondPoints = Math.max(0, ...others.map((o) => clampNonNegativeInt(o.points)));
-    const secondGroup = others
-      .filter((o) => clampNonNegativeInt(o.points) === secondPoints)
-      .map((o) => o.userId);
-
-    const secondPool = Math.floor(remainingPool * 0.2);
-    const firstPool = remainingPool - secondPool;
-
-    if (winnerId) earnedByUser[winnerId] = (earnedByUser[winnerId] ?? 0) + firstPool;
-
-    const secondPayouts = splitEvenlyCents(secondPool, secondGroup);
-    for (const p of secondPayouts) earnedByUser[p.userId] = (earnedByUser[p.userId] ?? 0) + p.cents;
-  }
-
-  const earnedByUserRemaining: Record<string, number> = {};
-  for (const userId of members) {
-    const staged = (Object.keys(earnedByUserByStage) as EarningsStageKey[]).reduce(
-      (sum, sk) => sum + (earnedByUserByStage[sk][userId] ?? 0),
-      0,
-    );
-    earnedByUserRemaining[userId] = (earnedByUser[userId] ?? 0) - staged;
-  }
-
-  return {
-    totalPotCents: totalPot,
-    poolsCents: {
-      groupStage: groupPool,
-      group_w1: w1Pool,
-      group_w2: w2Pool,
-      group_w3: w3Pool,
-      r32: r32Pool,
-      r16: r16Pool,
-      remaining: remainingPool,
-    },
-    earnedByUserCents: earnedByUser,
-    earnedByUserByStageCents: earnedByUserByStage,
-    earnedByUserRemainingCents: earnedByUserRemaining,
-  };
+  return total;
 }
+
+/**
+ * Odds-jump bonus (group stage):
+ *   2 positions better → +$1.00
+ *   3+ positions better → +$2.00
+ *
+ * "Jump" = player's draft position minus current odds position.
+ * Rankings are determined by sorting ascending by odds value (lower = favourite).
+ */
+export function oddsJumpBonusCents(
+  teams: OddsJumpInput[],
+  ownerTeamCodes: string[],
+): number {
+  if (!teams.length || !ownerTeamCodes.length) return 0;
+
+  // Sort by draft odds ascending (lower number = bigger favourite = rank 1)
+  const sorted = teams.slice().sort((a, b) => a.draftOdds - b.draftOdds);
+  const draftRank = new Map(sorted.map((t, i) => [t.teamCode, i]));
+
+  const sortedCurrent = teams.slice().sort((a, b) => a.currentOdds - b.currentOdds);
+  const currentRank = new Map(sortedCurrent.map((t, i) => [t.teamCode, i]));
+
+  let bonus = 0;
+  for (const code of ownerTeamCodes) {
+    const from = draftRank.get(code) ?? 0;
+    const to = currentRank.get(code) ?? 0;
+    const jump = from - to; // positive = moved up (improved)
+    if (jump >= 3) bonus += 200;
+    else if (jump >= 2) bonus += 100;
+  }
+  return bonus;
+}
+
+/** Sum earnings in cents across multiple matches for one player's teams. */
+export function totalEarningsCents(
+  matches: MatchResult[],
+  ownerTeamCodes: Set<string>,
+): number {
+  let total = 0;
+  for (const m of matches) {
+    const oh = ownerTeamCodes.has(m.homeTeam);
+    const oa = ownerTeamCodes.has(m.awayTeam);
+    total += matchEarningsCents(m, oh, oa);
+  }
+  return total;
+}
+
+export function formatDollars(cents: number): string {
+  const n = Math.max(0, Math.round(cents));
+  return `$${Math.floor(n / 100)}.${String(n % 100).padStart(2, "0")}`;
+}
+
