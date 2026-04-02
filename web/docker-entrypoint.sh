@@ -49,5 +49,5 @@ if [ "${SKIP_MIGRATIONS:-0}" != "1" ]; then
   npx prisma migrate deploy --schema prisma/schema.prisma
 fi
 
-echo "Starting app..."
-exec "$@"
+echo "Starting app on port ${PORT:-3000}..."
+exec "$@" -p "${PORT:-3000}"

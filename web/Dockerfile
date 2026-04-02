@@ -55,7 +55,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
 	&& chmod +x /usr/local/bin/docker-entrypoint.sh
 
-EXPOSE 3000
+EXPOSE ${PORT}
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["node_modules/.bin/next", "start", "-H", "0.0.0.0", "-p", "3000"]
+CMD ["node_modules/.bin/next", "start", "-H", "0.0.0.0"]
