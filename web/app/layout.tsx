@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import "./globals.css";
 
 import { AuthButtons } from "@/components/AuthButtons";
+import { SoccerBallIcon } from "@/components/SoccerBallIcon";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
@@ -21,7 +22,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "World Cuppy",
-  description: "World Cuppy friend pool game",
+  description: "International Fantasy Fútbol - Draft Nations",
+  icons: {
+    icon: "/worldcup.png",
+    apple: "/worldcup.png",
+  },
 };
 
 export default async function RootLayout({
@@ -75,34 +80,32 @@ export default async function RootLayout({
       >
         <div className="min-h-screen">
           {/* Nav */}
-          <div className="sticky top-0 z-30 bg-white shadow-sm">
+          <div className="sticky top-0 z-30 bg-zinc-900">
             <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-3">
               <Link
                 href="/"
                 aria-label="World Cuppy home"
                 className="flex items-center gap-2"
               >
-                <span className="text-2xl transition-transform duration-200 hover:rotate-12 hover:scale-110">
-                  ⚽
-                </span>
-                <span className="hidden bg-gradient-to-r from-emerald-600 to-emerald-400 bg-clip-text text-lg font-bold text-transparent sm:inline">
-                  World Cuppy
+                <SoccerBallIcon className="w-8 h-8 transition-transform duration-200 hover:rotate-12 hover:scale-110" />
+                <span className="hidden text-lg font-bold text-white sm:inline">
+                  World <span className="text-yellow-400">Cuppy</span>
                 </span>
               </Link>
 
               {session && (
                 <nav className="hidden items-center gap-1 md:flex">
-                  <Link href="/dashboard" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
+                  <Link href="/dashboard" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
                     Standings
                   </Link>
-                  <Link href="/draft" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
+                  <Link href="/draft" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
                     Draft
                   </Link>
-                  <Link href="/preview" className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
+                  <Link href="/preview" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
                     Preview
                   </Link>
                   {(isAdmin || siteOwner) && (
-                    <Link href="/admin" className="rounded-lg px-3 py-1.5 text-sm font-medium text-amber-600 transition-colors hover:bg-amber-50 hover:text-amber-700">
+                    <Link href="/admin" className="rounded-lg px-3 py-1.5 text-sm font-medium text-yellow-300 transition-colors hover:bg-white/10 hover:text-yellow-200">
                       Admin
                     </Link>
                   )}
@@ -115,7 +118,6 @@ export default async function RootLayout({
                 isAdmin={isAdmin || siteOwner}
               />
             </div>
-            <div className="h-0.5 bg-gradient-to-r from-emerald-500 to-emerald-400" />
           </div>
 
           <div>{children}</div>
