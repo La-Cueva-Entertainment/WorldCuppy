@@ -60,7 +60,7 @@ export function AuthButtons({
     <div className="flex items-center gap-3">
       <Link
         href="/login"
-        className="inline-flex h-9 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
+        className="inline-flex h-9 items-center rounded-xl border border-white/40 bg-white/10 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-white/20"
       >
         Sign in
       </Link>
