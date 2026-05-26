@@ -11,6 +11,16 @@ import Link from "next/link";
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
 
+const STAGE_LABELS: Record<string, string> = {
+  group: "Group",
+  r32:   "R32",
+  r16:   "R16",
+  qf:    "QF",
+  sf:    "SF",
+  "3rd": "3rd",
+  final: "Final",
+};
+
 export default async function LineupPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");

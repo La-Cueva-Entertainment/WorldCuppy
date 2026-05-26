@@ -7,6 +7,10 @@
         "/^cd /home/azar-linuxlt/Documents/Projects/WorldCuppy/web && npm install$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^git -C \"c:\\\\Users\\\\pcuser1\\\\Documents\\\\WorldCuppy\" add web/lib/players\\.ts web/app/lineup/page\\.tsx ; git -C \"c:\\\\Users\\\\pcuser1\\\\Documents\\\\WorldCuppy\" commit -m \"My Lineup: show star players and per-match earnings breakdown\" ; git -C \"c:\\\\Users\\\\pcuser1\\\\Documents\\\\WorldCuppy\" push$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }
