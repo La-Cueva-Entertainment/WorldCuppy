@@ -1,0 +1,124 @@
+const API_BASE = "https://api.football-data.org/v4";
+const TOKEN = process.env.FOOTBALL_DATA_API_TOKEN ?? "";
+const WC_COMPETITION = "2000";
+
+// Server-side rate limiter: max 8 calls per minute = 1 call per 7.5s minimum
+const CALL_INTERVAL_MS = 7500;
+let lastCallAt = 0;
+let nextAllowedAt = 0;
+
+export function getNextAllowedAt() {
+  return nextAllowedAt;
+}
+
+const STAGE_MAP: Record<string, string> = {
+  GROUP_STAGE: "group",
+  ROUND_OF_32: "r32",
+  ROUND_OF_16: "r16",
+  QUARTER_FINALS: "qf",
+  SEMI_FINALS: "sf",
+  THIRD_PLACE: "3rd",
+  FINAL: "final",
+};
+
+export interface ApiMatch {
+  externalId: string;
+  stage: string;
+  groupName: string | null;
+  homeTeam: string | null;
+  awayTeam: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  penaltyWinner: string | null;
+  played: boolean;
+  matchDate: Date | null;
+  venue: string | null;
+}
+
+export type RateLimitResult =
+  | { ok: false; reason: "rate_limited"; nextAllowedAt: number }
+  | { ok: false; reason: "no_token" }
+  | { ok: false; reason: "api_error"; status: number }
+  | { ok: true; matches: ApiMatch[]; requestsRemaining: number };
+
+export async function fetchWorldCupMatches(season = 2026): Promise<RateLimitResult> {
+  if (!TOKEN) return { ok: false, reason: "no_token" };
+
+  const now = Date.now();
+  if (now < nextAllowedAt) {
+    return { ok: false, reason: "rate_limited", nextAllowedAt };
+  }
+
+  lastCallAt = now;
+  nextAllowedAt = now + CALL_INTERVAL_MS;
+
+  const resp = await fetch(
+    `${API_BASE}/competitions/${WC_COMPETITION}/matches?season=${season}`,
+    {
+      headers: { "X-Auth-Token": TOKEN },
+      cache: "no-store",
+    }
+  );
+
+  // Check remaining quota — back off if ≤ 2 left in this minute
+  const remaining = Number(resp.headers.get("X-Requests-Available-Minute") ?? "10");
+  if (remaining <= 2) {
+    const resetSecs = Number(resp.headers.get("X-RequestCounter-Reset") ?? "60");
+    nextAllowedAt = Date.now() + resetSecs * 1000;
+  }
+
+  if (!resp.ok) return { ok: false, reason: "api_error", status: resp.status };
+
+  const data = (await resp.json()) as { matches: ApiRawMatch[] };
+
+  const matches: ApiMatch[] = data.matches.map((m) => {
+    const stage = STAGE_MAP[m.stage] ?? m.stage.toLowerCase();
+    const groupName = m.group ? m.group.replace(/^GROUP_/, "") : null;
+
+    const homeTla = m.homeTeam?.tla?.toLowerCase() ?? null;
+    const awayTla = m.awayTeam?.tla?.toLowerCase() ?? null;
+
+    const ft = m.score?.fullTime;
+    const homeScore = ft?.home ?? null;
+    const awayScore = ft?.away ?? null;
+
+    const played = m.status === "FINISHED";
+    let penaltyWinner: string | null = null;
+    if (played && m.score?.duration === "PENALTY_SHOOTOUT") {
+      penaltyWinner = m.score.winner === "HOME_TEAM" ? homeTla : m.score.winner === "AWAY_TEAM" ? awayTla : null;
+    }
+
+    return {
+      externalId: String(m.id),
+      stage,
+      groupName,
+      homeTeam: homeTla,
+      awayTeam: awayTla,
+      homeScore,
+      awayScore,
+      penaltyWinner,
+      played,
+      matchDate: m.utcDate ? new Date(m.utcDate) : null,
+      venue: m.venue ?? null,
+    };
+  });
+
+  return { ok: true, matches, requestsRemaining: remaining };
+}
+
+// Raw types from football-data.org v4
+interface ApiRawMatch {
+  id: number;
+  utcDate: string;
+  status: string;
+  stage: string;
+  group: string | null;
+  venue: string | null;
+  homeTeam: { tla: string | null } | null;
+  awayTeam: { tla: string | null } | null;
+  score: {
+    winner: string | null;
+    duration: string;
+    fullTime: { home: number | null; away: number | null };
+  } | null;
+}

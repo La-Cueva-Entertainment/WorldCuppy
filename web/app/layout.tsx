@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import "./globals.css";
 
 import { AuthButtons } from "@/components/AuthButtons";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
@@ -71,12 +72,19 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-zinc-900`}
-      >
+      <head>
+        {/* Apply stored theme before first paint to avoid flash */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          try {
+            var t = localStorage.getItem('theme') ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.classList.toggle('dark', t === 'dark');
+          } catch(e) {}
+        `}} />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <div className="min-h-screen">
-          {/* Nav */}
-          <div className="sticky top-0 z-30 bg-zinc-900" style={{ backgroundColor: '#18181b' }}>
+          {/* Nav — always dark */}
+          <div className="sticky top-0 z-30 bg-zinc-900">
             <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-3">
               <Link
                 href="/"
@@ -91,15 +99,17 @@ export default async function RootLayout({
 
               {session && (
                 <nav className="hidden items-center gap-1 md:flex">
-                  <Link href="/dashboard" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
+                  <Link href="/" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
                     Standings
                   </Link>
                   <Link href="/draft" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
                     Draft
                   </Link>
-                  <Link href="/preview" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
-                    Preview
-                  </Link>
+                  {(isAdmin || siteOwner) && (
+                    <Link href="/preview" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
+                      Preview
+                    </Link>
+                  )}
                   {(isAdmin || siteOwner) && (
                     <Link href="/admin" className="rounded-lg px-3 py-1.5 text-sm font-medium text-yellow-300 transition-colors hover:bg-white/10 hover:text-yellow-200">
                       Admin
@@ -108,11 +118,14 @@ export default async function RootLayout({
                 </nav>
               )}
 
-              <AuthButtons
-                signedIn={Boolean(session)}
-                picksCount={picksCount}
-                isAdmin={isAdmin || siteOwner}
-              />
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <AuthButtons
+                  signedIn={Boolean(session)}
+                  picksCount={picksCount}
+                  isAdmin={isAdmin || siteOwner}
+                />
+              </div>
             </div>
           </div>
 

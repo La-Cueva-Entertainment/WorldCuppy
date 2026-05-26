@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://api.football-data.org/v4/competitions/2000/matches?season=2026\" -H \"X-Auth-Token: 046c5a8b788248769d199bbebda823f3\" -D -)",
+      "Bash(npx prisma *)",
+      "Bash(Select-String \"\\\\.env\")"
+    ]
+  }
+}

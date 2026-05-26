@@ -2,7 +2,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
-import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
 import { CountryFlag } from "@/components/CountryFlag";
 import { DraftPickTimer } from "@/components/DraftPickTimer";
 import TieredTeamsBox from "@/components/TieredTeamsBox";
@@ -18,15 +17,6 @@ const MANAGER_COLORS = [
 ] as const;
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
-
-function shuffle<T>(items: T[]) {
-  const a = items.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
 
 export default async function DraftPage({
   searchParams,
@@ -47,18 +37,11 @@ export default async function DraftPage({
   }
   if (!userId) redirect("/login");
 
-  // Check if user is admin
-  const me = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { isAdmin: true, name: true, email: true },
-  });
-  const isAdmin = me?.isAdmin ?? false;
-
   // Active tournament
   const tournament = await prisma.tournament.findFirst({
     where: { status: { in: ["draft", "upcoming"] } },
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true },
+    select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true, draftDate: true },
   });
 
   if (!tournament) {
@@ -217,49 +200,6 @@ export default async function DraftPage({
     redirectDraft();
   }
 
-  async function startDraftAction(formData: FormData) {
-    "use server";
-
-    const session = await getServerSession(authOptions);
-    if (!session) redirect("/login");
-
-    let uid: string | undefined = session.user.id;
-    if (!uid) {
-      const email = session.user.email?.toLowerCase().trim();
-      if (email) {
-        const u = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-        uid = u?.id;
-      }
-    }
-    if (!uid) redirect("/login");
-
-    const adminUser = await prisma.user.findUnique({ where: { id: uid }, select: { isAdmin: true } });
-    if (!adminUser?.isAdmin) redirect("/draft?error=Admins%20only");
-
-    const tournamentId = String(formData.get("tournamentId") ?? "").trim();
-    if (!tournamentId) redirect("/draft");
-
-    const allPlayers = await prisma.user.findMany({
-      where: { lineupPicks: { none: {} } }, // placeholder — in practice just use all users
-      select: { id: true },
-    });
-
-    // Use all users who have accounts
-    const allUsers = await prisma.user.findMany({ select: { id: true } });
-    const orderIds = shuffle(allUsers.map((u) => u.id));
-
-    await prisma.tournamentDraft.upsert({
-      where: { tournamentId },
-      create: { tournamentId, status: "active", orderUserIds: orderIds, currentPick: 0 },
-      update: { status: "active", orderUserIds: orderIds, currentPick: 0 },
-    });
-
-    await prisma.lineupPick.deleteMany({ where: { tournamentId } });
-    await prisma.tournament.update({ where: { id: tournamentId }, data: { status: "draft" } });
-
-    redirect("/draft");
-  }
-
   const roundNumber = draftActive && orderUserIds.length > 0
     ? Math.floor(currentPick / orderUserIds.length) + 1
     : null;
@@ -280,30 +220,31 @@ export default async function DraftPage({
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-white">
-            Draft — <span className="text-green-400">{tournament.name} {tournament.year}</span>
+          <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white">
+            Draft — <span className="text-green-600 dark:text-green-400">{tournament.name} {tournament.year}</span>
           </h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
             {LINEUP_SIZE} teams per player · snake draft
           </p>
         </div>
 
-        {isAdmin && !draftActive && (
-          <form action={startDraftAction}>
-            <input type="hidden" name="tournamentId" value={tournament.id} />
-            <ConfirmSubmitButton
-              confirmText="Start the draft? This will reset any existing picks."
-              className="inline-flex h-10 items-center rounded-xl bg-amber-500/20 px-5 text-sm font-semibold text-amber-300 ring-1 ring-amber-500/40 hover:bg-amber-500/30"
-            >
-              Start Draft
-            </ConfirmSubmitButton>
-          </form>
+        {!draftActive && tournament.draftDate && (
+          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-5 py-3">
+            <div className="text-xs text-zinc-500 dark:text-zinc-400">Draft scheduled</div>
+            <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+              {tournament.draftDate.toLocaleString("en-US", {
+                timeZone: "America/Los_Angeles",
+                weekday: "long", month: "long", day: "numeric",
+                hour: "numeric", minute: "2-digit", hour12: true, timeZoneName: "short"
+              })}
+            </div>
+          </div>
         )}
       </div>
 
       {/* Error */}
       {resolved.error && (
-        <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+        <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-300">
           {resolved.error}
         </div>
       )}
@@ -311,13 +252,13 @@ export default async function DraftPage({
       {draftActive ? (
         <>
           {/* Draft status bar */}
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-4">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">Now Picking</div>
-              <div className="text-lg font-bold text-white">
+              <div className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-500 mb-0.5">Now Picking</div>
+              <div className="text-lg font-bold text-zinc-900 dark:text-white">
                 {canPickNow ? "Your turn! 🎉" : currentPickerName}
               </div>
-              <div className="text-xs text-zinc-400 mt-0.5">
+              <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Round {roundNumber} · Pick {pickInRound} of {orderUserIds.length}
               </div>
             </div>
@@ -341,8 +282,8 @@ export default async function DraftPage({
                   key={uid}
                   className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
                     isCurrent
-                      ? `bg-${colorKey}-500/25 ring-${colorKey}-500/60 text-${colorKey}-200 animate-pulse`
-                      : `bg-${colorKey}-500/10 ring-${colorKey}-500/20 text-${colorKey}-300`
+                      ? `bg-${colorKey}-500/25 ring-${colorKey}-500/60 text-${colorKey}-700 dark:text-${colorKey}-200 animate-pulse`
+                      : `bg-${colorKey}-500/10 ring-${colorKey}-500/20 text-${colorKey}-700 dark:text-${colorKey}-300`
                   }`}
                 >
                   {name} ({allPicks.filter((p) => p.userId === uid).length}/{LINEUP_SIZE})
@@ -352,8 +293,8 @@ export default async function DraftPage({
           </div>
         </>
       ) : (
-        <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-          <p className="text-sm text-zinc-300">
+        <div className="mb-6 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-300">
             {draft?.status === "complete" || currentPick >= maxPicks
               ? "Draft is complete! Check the standings."
               : "Draft has not started yet. Waiting for admin to begin."}

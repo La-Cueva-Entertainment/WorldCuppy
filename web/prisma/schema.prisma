@@ -19,25 +19,29 @@ model User {
   passwordHash  String?
   isAdmin       Boolean   @default(false)
 
-  accounts            Account[]
-  sessions            Session[]
-  lineupPicks         LineupPick[]
-  earningsAdjustments EarningsAdjustment[]
+  accounts             Account[]
+  sessions             Session[]
+  lineupPicks          LineupPick[]
+  earningsAdjustments  EarningsAdjustment[]
+  tournamentEntries    TournamentParticipant[]
 }
 
 model Tournament {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   name           String
-  type           String   // "world_cup" | "euros"
+  type           String    // "world_cup" | "euros"
   year           Int
-  teamsPerPlayer Int      @default(4)
-  status         String   @default("upcoming") // "upcoming" | "draft" | "active" | "complete"
-  createdAt      DateTime @default(now())
+  teamsPerPlayer Int       @default(4)
+  status         String    @default("upcoming") // "upcoming" | "draft" | "active" | "complete"
+  draftDate      DateTime?
+  inviteToken    String?   @unique
+  createdAt      DateTime  @default(now())
 
-  draft       TournamentDraft?
-  picks       LineupPick[]
-  matches     Match[]
-  adjustments EarningsAdjustment[]
+  draft        TournamentDraft?
+  picks        LineupPick[]
+  matches      Match[]
+  adjustments  EarningsAdjustment[]
+  participants TournamentParticipant[]
 }
 
 model TournamentDraft {
@@ -73,6 +77,7 @@ model LineupPick {
 
 model Match {
   id            String    @id @default(cuid())
+  externalId    String?   @unique
   tournamentId  String
   stage         String    // "group" | "r32" | "r16" | "qf" | "sf" | "3rd" | "final"
   groupName     String?
@@ -83,11 +88,25 @@ model Match {
   penaltyWinner String?   // team code - set when knockout ends on pens
   played        Boolean   @default(false)
   matchDate     DateTime?
+  venue         String?
   createdAt     DateTime  @default(now())
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   @@index([tournamentId, stage])
+}
+
+model TournamentParticipant {
+  tournamentId String
+  userId       String
+  joinedAt     DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([tournamentId, userId])
+  @@index([tournamentId])
+  @@index([userId])
 }
 
 model EarningsAdjustment {
