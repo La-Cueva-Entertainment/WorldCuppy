@@ -34,6 +34,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set image name
+        id: image
+        run: echo "name=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/worldcuppy" >> $GITHUB_OUTPUT
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -41,8 +45,8 @@ jobs:
           file: ./web/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/worldcuppy:${{ github.ref_name }}
-            ${{ github.ref == 'refs/heads/main' && format('ghcr.io/{0}/worldcuppy:latest', github.repository_owner) || '' }}
+            ${{ steps.image.outputs.name }}:${{ github.ref_name }}
+            ${{ github.ref == 'refs/heads/main' && format('{0}:latest', steps.image.outputs.name) || '' }}
           provenance: false
           sbom: false
           cache-from: type=gha
