@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import "./globals.css";
 
 import { AuthButtons } from "@/components/AuthButtons";
+import { NavLink } from "@/components/NavLink";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -99,16 +100,11 @@ export default async function RootLayout({
 
               {session && (
                 <nav className="hidden items-center gap-1 md:flex">
-                  <Link href="/" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
-                    Standings
-                  </Link>
-                  <Link href="/draft" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
-                    Draft
-                  </Link>
+                  <NavLink href="/" exact>Home</NavLink>
+                  <NavLink href="/standings">Standings</NavLink>
+                  <NavLink href="/draft">Draft</NavLink>
                   {(isAdmin || siteOwner) && (
-                    <Link href="/preview" className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
-                      Preview
-                    </Link>
+                    <NavLink href="/preview">Preview</NavLink>
                   )}
                   {(isAdmin || siteOwner) && (
                     <Link href="/admin" className="rounded-lg px-3 py-1.5 text-sm font-medium text-yellow-300 transition-colors hover:bg-white/10 hover:text-yellow-200">

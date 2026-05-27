@@ -33,6 +33,12 @@ export function AuthButtons({
           href="/"
           className="inline-flex h-9 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/20 md:hidden"
         >
+          Home
+        </Link>
+        <Link
+          href="/standings"
+          className="inline-flex h-9 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/20 md:hidden"
+        >
           Standings
         </Link>
 

@@ -2,16 +2,40 @@ import Link from "next/link";
 import Image from "next/image";
 import { getServerSession } from "next-auth";
 
-import TournamentView, { type TvPlayer, type TvMatch, type TvPayout } from "@/components/TournamentView";
+import { CountryFlag } from "@/components/CountryFlag";
+import { CountdownTimer } from "@/components/CountdownTimer";
+import { LiveSync } from "@/components/LiveSync";
+import RssFeed from "@/components/RssFeed";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
-import { matchEarningsCents, totalEarningsCents, formatDollars, type MatchResult } from "@/lib/earnings";
-import { MOCK_PLAYERS, MOCK_TODAY_MATCHES, MOCK_MATCHES_BY_STAGE } from "@/lib/mock-data";
-
-void formatDollars; // imported for earnings calc, not used directly in JSX here
+import { matchEarningsCents, formatDollars, type MatchResult } from "@/lib/earnings";
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
+
+const STAGE_LABELS: Record<string, string> = {
+  group: "Group Stage", r32: "Round of 32", r16: "Round of 16",
+  qf: "Quarter Finals", sf: "Semi Finals", "3rd": "3rd Place", final: "Final",
+};
+
+const PLAYER_COLORS = [
+  "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
+  "bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300",
+  "bg-sky-100 dark:bg-sky-500/15 text-sky-800 dark:text-sky-300",
+  "bg-rose-100 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300",
+  "bg-purple-100 dark:bg-purple-500/15 text-purple-800 dark:text-purple-300",
+  "bg-orange-100 dark:bg-orange-500/15 text-orange-800 dark:text-orange-300",
+  "bg-cyan-100 dark:bg-cyan-500/15 text-cyan-800 dark:text-cyan-300",
+  "bg-fuchsia-100 dark:bg-fuchsia-500/15 text-fuchsia-800 dark:text-fuchsia-300",
+];
+
+function fmtTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
+    hour: "numeric", minute: "2-digit", hour12: true, timeZoneName: "short",
+  });
+}
 
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
@@ -80,168 +104,204 @@ export default async function HomePage() {
     );
   }
 
+  // ── Fetch tournament data ─────────────────────────────────────────
+  let userId: string | undefined = session.user.id;
+  if (!userId) {
+    const email = session.user.email?.toLowerCase().trim();
+    if (email) {
+      const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+      userId = user?.id;
+    }
+  }
+
   const tournament = await prisma.tournament.findFirst({
-    where: { status: { in: ["draft", "active", "complete"] } },
+    where: { status: { in: ["upcoming", "draft", "active", "complete"] } },
     orderBy: { createdAt: "desc" },
     select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true, draftDate: true },
   });
-
-  if (!tournament) {
-    const upcoming = await prisma.tournament.findFirst({
-      where: { status: "upcoming" },
-      orderBy: { createdAt: "desc" },
-      select: { name: true, year: true, draftDate: true },
-    });
-    return (
-      <TournamentView
-        name={upcoming?.name ?? "FIFA World Cup"}
-        year={upcoming?.year ?? 2026}
-        isDemo={true}
-        draftDateISO={upcoming?.draftDate?.toISOString() ?? null}
-        players={MOCK_PLAYERS}
-        todayMatches={MOCK_TODAY_MATCHES}
-        matchesByStage={MOCK_MATCHES_BY_STAGE}
-      />
-    );
-  }
-
-  // ── Fetch all data ───────────────────────────────────────────────
-  const [picks, playedMatches, users, adjustments] = await Promise.all([
-    prisma.lineupPick.findMany({
-      where: { tournamentId: tournament.id },
-      select: { userId: true, teamCode: true },
-    }),
-    prisma.match.findMany({
-      where: { tournamentId: tournament.id, played: true },
-      select: { stage: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true },
-    }),
-    prisma.user.findMany({ select: { id: true, name: true, email: true } }),
-    prisma.earningsAdjustment.findMany({
-      where: { tournamentId: tournament.id },
-      select: { userId: true, amountCents: true },
-    }),
-  ]);
-
-  const userById = new Map(users.map((u) => [u.id, u]));
-  const playerIds = [...new Set(picks.map((p) => p.userId))].sort();
-
-  const teamOwners = new Map<string, string[]>();
-  const teamsByPlayer = new Map<string, Set<string>>();
-  for (const p of picks) {
-    const arr = teamOwners.get(p.teamCode) ?? [];
-    arr.push(p.userId);
-    teamOwners.set(p.teamCode, arr);
-    const s = teamsByPlayer.get(p.userId) ?? new Set<string>();
-    s.add(p.teamCode);
-    teamsByPlayer.set(p.userId, s);
-  }
-
-  const matchResults: MatchResult[] = playedMatches.map((m) => ({
-    stage: m.stage as MatchResult["stage"],
-    tournamentType: tournament.type as MatchResult["tournamentType"],
-    homeTeam: m.homeTeam, awayTeam: m.awayTeam,
-    homeScore: m.homeScore ?? 0, awayScore: m.awayScore ?? 0,
-    penaltyWinner: m.penaltyWinner ?? null,
-  }));
-
-  const ranked = playerIds
-    .map((uid, i) => ({ uid, colorIdx: i, earnings: totalEarningsCents(matchResults, teamsByPlayer.get(uid) ?? new Set()) + adjustments.filter((a) => a.userId === uid).reduce((s, a) => s + a.amountCents, 0) }))
-    .sort((a, b) => b.earnings - a.earnings);
 
   // ── Today's matches ──────────────────────────────────────────────
   const nowPST = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
   const todayStart = new Date(Date.UTC(nowPST.getFullYear(), nowPST.getMonth(), nowPST.getDate(), 8, 0, 0));
   const todayEnd = new Date(Date.UTC(nowPST.getFullYear(), nowPST.getMonth(), nowPST.getDate() + 1, 8, 0, 0));
-  const [todayDbMatches, allDbMatches] = await Promise.all([
-    prisma.match.findMany({
-      where: { tournamentId: tournament.id, matchDate: { gte: todayStart, lte: todayEnd } },
-      orderBy: { matchDate: "asc" },
-      select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, matchDate: true, venue: true },
-    }),
-    prisma.match.findMany({
-      where: { tournamentId: tournament.id },
-      orderBy: [{ matchDate: "asc" }, { createdAt: "asc" }],
-      select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, matchDate: true, venue: true },
-    }),
-  ]);
 
-  // ── Convert to TournamentView types ─────────────────────────────
-  function ownerInfo(teamCode: string) {
-    const ids = teamOwners.get(teamCode) ?? [];
-    return {
-      names: ids.map((id) => { const u = userById.get(id); return u?.name ?? u?.email?.split("@")[0] ?? "?"; }),
-      colorIdx: ids.length > 0 ? playerIds.indexOf(ids[0]) : null,
-    };
+  const [todayDbMatches, allPicks, users] = tournament
+    ? await Promise.all([
+        prisma.match.findMany({
+          where: { tournamentId: tournament.id, matchDate: { gte: todayStart, lte: todayEnd } },
+          orderBy: { matchDate: "asc" },
+          select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, matchDate: true, venue: true },
+        }),
+        prisma.lineupPick.findMany({
+          where: { tournamentId: tournament.id },
+          select: { userId: true, teamCode: true },
+        }),
+        prisma.user.findMany({ select: { id: true, name: true, email: true } }),
+      ])
+    : [[], [], []];
+
+  const userById = new Map(users.map((u: { id: string; name: string | null; email: string | null }) => [u.id, u]));
+  const playerIds = [...new Set(allPicks.map((p: { userId: string; teamCode: string }) => p.userId))].sort();
+  const teamsByPlayer = new Map<string, Set<string>>();
+  for (const p of allPicks) {
+    const s = teamsByPlayer.get(p.userId) ?? new Set<string>();
+    s.add(p.teamCode);
+    teamsByPlayer.set(p.userId, s);
   }
 
-  type DbMatch = typeof allDbMatches[0];
-  function convertMatch(dbm: DbMatch, payouts?: TvPayout[]): TvMatch {
-    const ho = ownerInfo(dbm.homeTeam);
-    const ao = ownerInfo(dbm.awayTeam);
-    return {
-      id: dbm.id,
-      stage: dbm.stage,
-      groupName: dbm.groupName,
-      homeTeam: dbm.homeTeam,
-      homeTeamName: TEAMS_BY_CODE.get(dbm.homeTeam)?.name ?? dbm.homeTeam,
-      awayTeam: dbm.awayTeam,
-      awayTeamName: TEAMS_BY_CODE.get(dbm.awayTeam)?.name ?? dbm.awayTeam,
-      homeScore: dbm.homeScore,
-      awayScore: dbm.awayScore,
-      penaltyWinner: dbm.penaltyWinner,
-      played: dbm.played,
-      matchDateISO: dbm.matchDate ? dbm.matchDate.toISOString() : null,
-      venue: dbm.venue,
-      payouts,
-      homeOwnerNames: ho.names,
-      homeOwnerColorIdx: ho.colorIdx,
-      awayOwnerNames: ao.names,
-      awayOwnerColorIdx: ao.colorIdx,
-    };
-  }
-
-  const tvPlayers: TvPlayer[] = ranked.map((r) => {
-    const user = userById.get(r.uid);
-    const teams = [...(teamsByPlayer.get(r.uid) ?? [])].map((code) => ({
-      code, name: TEAMS_BY_CODE.get(code)?.name ?? code,
-    }));
-    return { id: r.uid, name: user?.name ?? user?.email ?? r.uid.slice(0, 8), earnings: r.earnings, teams, colorIdx: r.colorIdx };
-  });
-
-  const tvTodayMatches: TvMatch[] = todayDbMatches.map((dbm) => {
-    const mr: MatchResult = {
-      stage: dbm.stage as MatchResult["stage"],
-      tournamentType: tournament.type as MatchResult["tournamentType"],
-      homeTeam: dbm.homeTeam, awayTeam: dbm.awayTeam,
-      homeScore: dbm.homeScore ?? 0, awayScore: dbm.awayScore ?? 0,
-      penaltyWinner: dbm.penaltyWinner ?? null,
-    };
-    const payouts: TvPayout[] = playerIds.flatMap((uid) => {
-      const teams = teamsByPlayer.get(uid) ?? new Set<string>();
-      const cents = matchEarningsCents(mr, teams.has(dbm.homeTeam), teams.has(dbm.awayTeam));
-      if (cents === 0) return [];
-      const u = userById.get(uid);
-      return [{ playerId: uid, playerName: u?.name ?? u?.email?.split("@")[0] ?? "?", colorIdx: playerIds.indexOf(uid), cents }];
-    });
-    return convertMatch(dbm, payouts);
-  });
-
-  const tvMatchesByStage: Partial<Record<string, TvMatch[]>> = {};
-  for (const dbm of allDbMatches) {
-    const arr = tvMatchesByStage[dbm.stage] ?? [];
-    arr.push(convertMatch(dbm));
-    tvMatchesByStage[dbm.stage] = arr;
-  }
+  const showDraftCard = tournament && (tournament.status === "upcoming" || tournament.status === "draft");
+  const showLiveSync = tournament?.status === "active";
 
   return (
-    <TournamentView
-      name={tournament.name}
-      year={tournament.year}
-      status={tournament.status}
-      showLiveSync={tournament.status === "active"}
-      players={tvPlayers}
-      todayMatches={tvTodayMatches}
-      matchesByStage={tvMatchesByStage}
-    />
+    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+        {/* Main column */}
+        <div className="space-y-8 min-w-0">
+
+          {/* Draft Card */}
+          {showDraftCard && (
+            <section className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-500/10 dark:to-green-500/5 p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">
+                    {tournament.status === "draft" ? "Draft Open" : "Coming Up"}
+                  </div>
+                  <h2 className="text-2xl font-extrabold text-zinc-900 dark:text-white">
+                    {tournament.name} <span className="text-emerald-600 dark:text-emerald-400">{tournament.year}</span>
+                  </h2>
+                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    {tournament.teamsPerPlayer} teams per player · snake draft
+                  </p>
+                </div>
+                <Link
+                  href="/draft"
+                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
+                >
+                  Open Draft →
+                </Link>
+              </div>
+
+              {tournament.draftDate && (
+                <div className="mt-5">
+                  <CountdownTimer
+                    targetISO={tournament.draftDate.toISOString()}
+                    label={`${tournament.name} ${tournament.year} Draft`}
+                  />
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* No tournament at all */}
+          {!tournament && (
+            <section className="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-6 py-10 text-center">
+              <div className="text-4xl mb-3">⚽</div>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">No tournament yet</h2>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                A tournament will appear here once it&apos;s created. Stay tuned!
+              </p>
+            </section>
+          )}
+
+          {/* Today's Matches */}
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+                Today&apos;s Matches
+              </h2>
+              {showLiveSync && <LiveSync />}
+            </div>
+
+            {todayDbMatches.length === 0 ? (
+              <div className="rounded-2xl border border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 px-5 py-8 text-center text-sm text-zinc-400 dark:text-zinc-500">
+                No matches scheduled for today.
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {todayDbMatches.map((m) => {
+                  const homeWon = m.played && ((m.homeScore ?? 0) > (m.awayScore ?? 0) || m.penaltyWinner === m.homeTeam);
+                  const awayWon = m.played && ((m.awayScore ?? 0) > (m.homeScore ?? 0) || m.penaltyWinner === m.awayTeam);
+                  const kickoff = fmtTime(m.matchDate?.toISOString());
+
+                  const mr: MatchResult = {
+                    stage: m.stage as MatchResult["stage"],
+                    tournamentType: (tournament?.type ?? "world_cup") as MatchResult["tournamentType"],
+                    homeTeam: m.homeTeam, awayTeam: m.awayTeam,
+                    homeScore: m.homeScore ?? 0, awayScore: m.awayScore ?? 0,
+                    penaltyWinner: m.penaltyWinner ?? null,
+                  };
+
+                  const payouts = playerIds.flatMap((uid: string) => {
+                    const teams = teamsByPlayer.get(uid) ?? new Set<string>();
+                    const cents = matchEarningsCents(mr, teams.has(m.homeTeam), teams.has(m.awayTeam));
+                    if (cents === 0) return [];
+                    const u = userById.get(uid);
+                    return [{ playerId: uid, playerName: u?.name ?? u?.email?.split("@")[0] ?? "?", colorIdx: playerIds.indexOf(uid), cents }];
+                  });
+
+                  return (
+                    <div key={m.id} className={`rounded-2xl border p-4 ${
+                      m.played
+                        ? "border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5"
+                        : "border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5"
+                    }`}>
+                      <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                        <span>{STAGE_LABELS[m.stage] ?? m.stage}{m.groupName ? ` · Grp ${m.groupName}` : ""}</span>
+                        {kickoff && !m.played && <span>{kickoff}</span>}
+                        {m.played && <span className="text-emerald-600 dark:text-emerald-400">Final</span>}
+                      </div>
+                      {m.venue && !m.played && (
+                        <div className="mb-2 text-[10px] text-zinc-400 dark:text-zinc-500 truncate">{m.venue}</div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <div className={`flex min-w-0 flex-1 items-center gap-1.5 ${m.played && !homeWon ? "opacity-50" : ""}`}>
+                          <CountryFlag code={m.homeTeam} label={TEAMS_BY_CODE.get(m.homeTeam)?.name ?? m.homeTeam} className="h-5 w-7 shrink-0" />
+                          <span className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{TEAMS_BY_CODE.get(m.homeTeam)?.name ?? m.homeTeam}</span>
+                        </div>
+                        <div className="shrink-0 text-center">
+                          {m.played ? (
+                            <span className="font-mono text-base font-bold text-zinc-900 dark:text-white">
+                              {m.homeScore}<span className="text-zinc-400 dark:text-zinc-500"> – </span>{m.awayScore}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-zinc-400 dark:text-zinc-500">vs</span>
+                          )}
+                          {m.penaltyWinner && <div className="text-[10px] text-amber-600 dark:text-amber-400">pens</div>}
+                        </div>
+                        <div className={`flex min-w-0 flex-1 flex-row-reverse items-center gap-1.5 ${m.played && !awayWon ? "opacity-50" : ""}`}>
+                          <CountryFlag code={m.awayTeam} label={TEAMS_BY_CODE.get(m.awayTeam)?.name ?? m.awayTeam} className="h-5 w-7 shrink-0" />
+                          <span className="truncate text-right text-sm font-semibold text-zinc-900 dark:text-white">{TEAMS_BY_CODE.get(m.awayTeam)?.name ?? m.awayTeam}</span>
+                        </div>
+                      </div>
+                      {payouts.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-zinc-100 dark:border-white/5 pt-3">
+                          {payouts.map((p) => (
+                            <span key={p.playerId} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${PLAYER_COLORS[p.colorIdx % PLAYER_COLORS.length]}`}>
+                              {p.playerName} +{formatDollars(p.cents)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* RSS Sidebar */}
+        <aside className="hidden lg:block">
+          <div className="sticky top-20">
+            <RssFeed />
+          </div>
+        </aside>
+      </div>
+
+      {/* RSS on mobile (below main content) */}
+      <div className="mt-8 lg:hidden">
+        <RssFeed />
+      </div>
+    </main>
   );
 }

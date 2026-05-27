@@ -1,0 +1,143 @@
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+
+import TournamentView, { type TvPlayer, type TvMatch } from "@/components/TournamentView";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { TEAMS } from "@/lib/teams";
+import { totalEarningsCents, type MatchResult } from "@/lib/earnings";
+
+const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
+
+export default async function StandingsPage() {
+  const session = await getServerSession(authOptions);
+  if (!session) redirect("/login");
+
+  const tournament = await prisma.tournament.findFirst({
+    where: { status: { in: ["draft", "active", "complete"] } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true },
+  });
+
+  if (!tournament) {
+    return (
+      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+        <h1 className="mb-8 text-3xl font-extrabold text-zinc-900 dark:text-white">Standings</h1>
+        <div className="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-6 py-16 text-center">
+          <div className="text-4xl mb-3">📊</div>
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-white">No active tournament</h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Standings and bracket will appear here once a tournament is underway.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const [picks, playedMatches, users, adjustments, allDbMatches] = await Promise.all([
+    prisma.lineupPick.findMany({
+      where: { tournamentId: tournament.id },
+      select: { userId: true, teamCode: true },
+    }),
+    prisma.match.findMany({
+      where: { tournamentId: tournament.id, played: true },
+      select: { stage: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true },
+    }),
+    prisma.user.findMany({ select: { id: true, name: true, email: true } }),
+    prisma.earningsAdjustment.findMany({
+      where: { tournamentId: tournament.id },
+      select: { userId: true, amountCents: true },
+    }),
+    prisma.match.findMany({
+      where: { tournamentId: tournament.id },
+      orderBy: [{ matchDate: "asc" }, { createdAt: "asc" }],
+      select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, matchDate: true, venue: true },
+    }),
+  ]);
+
+  const userById = new Map(users.map((u) => [u.id, u]));
+  const playerIds = [...new Set(picks.map((p) => p.userId))].sort();
+
+  const teamOwners = new Map<string, string[]>();
+  const teamsByPlayer = new Map<string, Set<string>>();
+  for (const p of picks) {
+    const arr = teamOwners.get(p.teamCode) ?? [];
+    arr.push(p.userId);
+    teamOwners.set(p.teamCode, arr);
+    const s = teamsByPlayer.get(p.userId) ?? new Set<string>();
+    s.add(p.teamCode);
+    teamsByPlayer.set(p.userId, s);
+  }
+
+  const matchResults: MatchResult[] = playedMatches.map((m) => ({
+    stage: m.stage as MatchResult["stage"],
+    tournamentType: tournament.type as MatchResult["tournamentType"],
+    homeTeam: m.homeTeam, awayTeam: m.awayTeam,
+    homeScore: m.homeScore ?? 0, awayScore: m.awayScore ?? 0,
+    penaltyWinner: m.penaltyWinner ?? null,
+  }));
+
+  const ranked = playerIds
+    .map((uid, i) => ({ uid, colorIdx: i, earnings: totalEarningsCents(matchResults, teamsByPlayer.get(uid) ?? new Set()) + adjustments.filter((a) => a.userId === uid).reduce((s, a) => s + a.amountCents, 0) }))
+    .sort((a, b) => b.earnings - a.earnings);
+
+  function ownerInfo(teamCode: string) {
+    const ids = teamOwners.get(teamCode) ?? [];
+    return {
+      names: ids.map((id) => { const u = userById.get(id); return u?.name ?? u?.email?.split("@")[0] ?? "?"; }),
+      colorIdx: ids.length > 0 ? playerIds.indexOf(ids[0]) : null,
+    };
+  }
+
+  type DbMatch = typeof allDbMatches[0];
+  function convertMatch(dbm: DbMatch): TvMatch {
+    const ho = ownerInfo(dbm.homeTeam);
+    const ao = ownerInfo(dbm.awayTeam);
+    return {
+      id: dbm.id,
+      stage: dbm.stage,
+      groupName: dbm.groupName,
+      homeTeam: dbm.homeTeam,
+      homeTeamName: TEAMS_BY_CODE.get(dbm.homeTeam)?.name ?? dbm.homeTeam,
+      awayTeam: dbm.awayTeam,
+      awayTeamName: TEAMS_BY_CODE.get(dbm.awayTeam)?.name ?? dbm.awayTeam,
+      homeScore: dbm.homeScore,
+      awayScore: dbm.awayScore,
+      penaltyWinner: dbm.penaltyWinner,
+      played: dbm.played,
+      matchDateISO: dbm.matchDate ? dbm.matchDate.toISOString() : null,
+      venue: dbm.venue,
+      homeOwnerNames: ho.names,
+      homeOwnerColorIdx: ho.colorIdx,
+      awayOwnerNames: ao.names,
+      awayOwnerColorIdx: ao.colorIdx,
+    };
+  }
+
+  const tvPlayers: TvPlayer[] = ranked.map((r) => {
+    const user = userById.get(r.uid);
+    const teams = [...(teamsByPlayer.get(r.uid) ?? [])].map((code) => ({
+      code, name: TEAMS_BY_CODE.get(code)?.name ?? code,
+    }));
+    return { id: r.uid, name: user?.name ?? user?.email ?? r.uid.slice(0, 8), earnings: r.earnings, teams, colorIdx: r.colorIdx };
+  });
+
+  const tvMatchesByStage: Partial<Record<string, TvMatch[]>> = {};
+  for (const dbm of allDbMatches) {
+    const arr = tvMatchesByStage[dbm.stage] ?? [];
+    arr.push(convertMatch(dbm));
+    tvMatchesByStage[dbm.stage] = arr;
+  }
+
+  return (
+    <TournamentView
+      name={tournament.name}
+      year={tournament.year}
+      status={tournament.status}
+      showTodayMatches={false}
+      todayMatches={[]}
+      players={tvPlayers}
+      matchesByStage={tvMatchesByStage}
+    />
+  );
+}

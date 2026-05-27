@@ -45,6 +45,7 @@ export interface TournamentViewProps {
   status?: string | null;
   isDemo?: boolean;
   showLiveSync?: boolean;
+  showTodayMatches?: boolean;
   draftDateISO?: string | null;
   players: TvPlayer[];
   todayMatches: TvMatch[];
@@ -84,7 +85,7 @@ function fmtTime(iso: string | null | undefined, includeDate = false): string | 
 }
 
 export default function TournamentView({
-  name, year, status, isDemo, showLiveSync, draftDateISO,
+  name, year, status, isDemo, showLiveSync, showTodayMatches = true, draftDateISO,
   players, todayMatches, matchesByStage,
 }: TournamentViewProps) {
   const hasAnyMatches = STAGE_ORDER.some((s) => (matchesByStage[s]?.length ?? 0) > 0);
@@ -112,18 +113,12 @@ export default function TournamentView({
           {name} <span className="text-emerald-600 dark:text-emerald-400">{year}</span>
         </h1>
         <div className="mt-1 flex items-center gap-3">
-          {isDemo ? (
-            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">● Live</p>
-          ) : (
-            <>
-              {status && <p className="text-sm text-zinc-500 dark:text-zinc-400 capitalize">{status}</p>}
-              {showLiveSync && <LiveSync />}
-            </>
-          )}
+          {!isDemo && status && <p className="text-sm text-zinc-500 dark:text-zinc-400 capitalize">{status}</p>}
+          {showLiveSync && <LiveSync />}
         </div>
       </div>
 
-      {todayMatches.length > 0 && (
+      {showTodayMatches && todayMatches.length > 0 && (
         <section className="mb-8">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
             Today&apos;s Matches

@@ -97,11 +97,24 @@ export default async function DraftPage({
     };
   }
 
-  // Tier the teams by rank
+  // Deterministic shuffle seeded by tournament ID so all players see the same order
+  function seededShuffle<T>(arr: T[], seed: string): T[] {
+    let s = Array.from(seed).reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0) >>> 0;
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+      const j = s % (i + 1);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // Build tiers by rank, then shuffle within each tier
   const sorted = TEAMS.slice().sort((a, b) => a.rank - b.rank);
   const chunkSize = Math.ceil(sorted.length / 4);
   const tiers = [0, 1, 2, 3].map((ti) => {
     const chunk = sorted.slice(ti * chunkSize, (ti + 1) * chunkSize);
+    const shuffled = seededShuffle(chunk, tournament.id + ti);
     const minRank = chunk[0]?.rank ?? 0;
     const maxRank = chunk[chunk.length - 1]?.rank ?? 0;
     return {
@@ -109,7 +122,7 @@ export default async function DraftPage({
       labelBase: `Tier ${ti + 1}`,
       label: `Tier ${ti + 1}`,
       rangeLabel: `Rank ${minRank}–${maxRank}`,
-      teams: chunk.map((t) => ({ code: t.code, name: t.name, rank: t.rank })),
+      teams: shuffled.map((t) => ({ code: t.code, name: t.name, rank: t.rank })),
     };
   });
 
@@ -295,9 +308,11 @@ export default async function DraftPage({
       ) : (
         <div className="mb-6 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            {draft?.status === "complete" || currentPick >= maxPicks
+            {draft?.status === "complete" || (maxPicks > 0 && currentPick >= maxPicks)
               ? "Draft is complete! Check the standings."
-              : "Draft has not started yet. Waiting for admin to begin."}
+              : orderUserIds.length === 0
+                ? "No participants enrolled yet. An admin needs to set up the draft."
+                : "Draft has not started yet. Waiting for admin to begin."}
           </p>
         </div>
       )}
@@ -315,6 +330,7 @@ export default async function DraftPage({
         lineupSize={LINEUP_SIZE}
         draftTeamAction={draftTeamAction}
         showDraftControls
+        showRanks={false}
         extraFormFields={
           <input type="hidden" name="tournamentId" value={tournament.id} />
         }

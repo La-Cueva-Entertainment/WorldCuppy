@@ -28,7 +28,7 @@ function getOwnerStyle(idx: number) {
 export default function TieredTeamsBox({
   tiers, initialTierKey, takenTeamCodes, myTeamCodes, takenBy,
   canDraft, canPickNow, tournamentId, picksCount, lineupSize,
-  draftTeamAction, showDraftControls = true, extraFormFields,
+  draftTeamAction, showDraftControls = true, showRanks = true, extraFormFields,
 }: {
   tiers: TierData[];
   initialTierKey?: string;
@@ -42,6 +42,7 @@ export default function TieredTeamsBox({
   lineupSize: number;
   draftTeamAction?: (formData: FormData) => Promise<void>;
   showDraftControls?: boolean;
+  showRanks?: boolean;
   extraFormFields?: React.ReactNode;
 }) {
   const selectorRef = useRef<HTMLDivElement | null>(null);
@@ -69,10 +70,16 @@ export default function TieredTeamsBox({
 
   const makeReturnTo = useMemo(() => {
     return (tierKey: string) => {
-      if (!tierKey || tierKey === "all") return pathname;
-      return `${pathname}?tier=${encodeURIComponent(tierKey)}`;
+      const params = new URLSearchParams(searchParams.toString());
+      if (!tierKey || tierKey === "all") {
+        params.delete("tier");
+      } else {
+        params.set("tier", tierKey);
+      }
+      const qs = params.toString();
+      return qs ? `${pathname}?${qs}` : pathname;
     };
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
   const takenSet = useMemo(() => new Set(takenTeamCodes.map((c) => c.toLowerCase())), [takenTeamCodes]);
   const takenByMap = useMemo(() => {
@@ -83,7 +90,10 @@ export default function TieredTeamsBox({
   }, [takenBy]);
   const mineSet = useMemo(() => new Set(myTeamCodes.map((c) => c.toLowerCase())), [myTeamCodes]);
   const visibleTiers = useMemo(() => selectedTierKey === "all" ? tiers : tiers.filter((t) => t.key === selectedTierKey), [selectedTierKey, tiers]);
-  const allTeams = useMemo(() => tiers.flatMap((t) => t.teams).slice().sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name)), [tiers]);
+  const allTeams = useMemo(() => {
+    const flat = tiers.flatMap((t) => t.teams);
+    return showRanks ? flat.slice().sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name)) : flat;
+  }, [tiers, showRanks]);
 
   function handleTierChange(nextTierKey: string) {
     const beforeTop = selectorRef.current?.getBoundingClientRect().top ?? null;
@@ -145,7 +155,7 @@ export default function TieredTeamsBox({
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-xs font-medium text-zinc-900 dark:text-white">{t.name}</div>
                     </div>
-                    <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">#{t.rank}</div>
+                    {showRanks && <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">#{t.rank}</div>}
                     {taken ? (
                       takenInfo ? (
                         <div
@@ -200,7 +210,9 @@ export default function TieredTeamsBox({
               <div key={tier.key}>
                 <div className="flex items-baseline justify-between">
                   <div className="text-sm font-semibold text-zinc-900 dark:text-white">{tier.labelBase}</div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400">{tier.rangeLabel} · {tier.teams.length} teams</div>
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {showRanks ? `${tier.rangeLabel} · ` : ""}{tier.teams.length} teams
+                  </div>
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {tier.teams.map((t) => {
@@ -223,14 +235,16 @@ export default function TieredTeamsBox({
                         )}
                         <div className="relative flex items-start gap-3">
                           <CountryFlag code={t.code} label={t.name} className="h-7 w-10" />
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{t.name}</div>
-                            <div className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">FIFA rank #{t.rank}</div>
+                            {showRanks && <div className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">FIFA rank #{t.rank}</div>}
                           </div>
-                          <div className="ml-auto text-right">
-                            <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">Rank</div>
-                            <div className="text-base font-semibold text-emerald-700 dark:text-emerald-300">#{t.rank}</div>
-                          </div>
+                          {showRanks && (
+                            <div className="ml-auto text-right">
+                              <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">Rank</div>
+                              <div className="text-base font-semibold text-emerald-700 dark:text-emerald-300">#{t.rank}</div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="relative mt-3 flex items-center gap-2">

@@ -1,4 +1,6 @@
 import type { TvPlayer, TvMatch, TvPayout } from "@/components/TournamentView";
+import type { ProfileContentProps } from "@/components/ProfileContent";
+import { TEAMS } from "@/lib/teams";
 
 const OWNERS: Record<string, { names: string[]; colorIdx: number }> = {
   fr: { names: ["Anthony"], colorIdx: 0 },
@@ -8,7 +10,8 @@ const OWNERS: Record<string, { names: string[]; colorIdx: number }> = {
   be: { names: ["Ruben"],   colorIdx: 4 },
   de: { names: ["Spencer"], colorIdx: 5 },
   it: { names: ["Ricardo"], colorIdx: 7 },
-  pt: { names: ["Angel", "Chris"], colorIdx: 3 },
+  pt: { names: ["Angel"], colorIdx: 3 },
+  ch: { names: ["Chris"], colorIdx: 6 },
   "gb-eng": { names: ["Joe"],   colorIdx: 1 },
   nl:       { names: ["Nico"],  colorIdx: 2 },
   hr:       { names: ["Ruben"], colorIdx: 4 },
@@ -49,7 +52,7 @@ export const MOCK_PLAYERS: TvPlayer[] = [
   { id: "1", name: "Angel",   earnings: 4800, colorIdx: 3, teams: [{ code: "br", name: "Brazil" }, { code: "pt", name: "Portugal" }, { code: "au", name: "Australia" }, { code: "ma", name: "Morocco" }] },
   { id: "6", name: "Ruben",   earnings: 3725, colorIdx: 4, teams: [{ code: "be", name: "Belgium" }, { code: "hr", name: "Croatia" }, { code: "ci", name: "Côte d'Ivoire" }, { code: "ec", name: "Ecuador" }] },
   { id: "5", name: "Spencer", earnings: 3100, colorIdx: 5, teams: [{ code: "de", name: "Germany" }, { code: "us", name: "USA" }, { code: "gh", name: "Ghana" }, { code: "kr", name: "South Korea" }] },
-  { id: "8", name: "Chris",   earnings: 2450, colorIdx: 6, teams: [{ code: "pt", name: "Portugal" }, { code: "dk", name: "Denmark" }, { code: "pe", name: "Peru" }, { code: "qa", name: "Qatar" }] },
+  { id: "8", name: "Chris",   earnings: 2450, colorIdx: 6, teams: [{ code: "ch", name: "Switzerland" }, { code: "dk", name: "Denmark" }, { code: "pe", name: "Peru" }, { code: "qa", name: "Qatar" }] },
   { id: "7", name: "Ricardo", earnings: 1875, colorIdx: 7, teams: [{ code: "it", name: "Italy" }, { code: "uy", name: "Uruguay" }, { code: "cm", name: "Cameroon" }, { code: "rs", name: "Serbia" }] },
 ];
 
@@ -90,3 +93,129 @@ export const MOCK_MATCHES_BY_STAGE: Partial<Record<string, TvMatch[]>> = {
   sf:    ALL_MATCHES.filter((x) => x.stage === "sf"),
   final: ALL_MATCHES.filter((x) => x.stage === "final"),
 };
+
+// ─── Profile preview mock data ────────────────────────────────────────────────
+
+export const MOCK_PROFILE_PROPS: ProfileContentProps = {
+  upcomingTournament: {
+    id: "mock-upcoming-1",
+    name: "FIFA World Cup",
+    year: 2026,
+    status: "draft",
+    draftDate: null,
+    teamsPerPlayer: 4,
+  },
+  activeTournamentName: "Copa América 2024",
+  totalEarnedCents: 875,
+  teams: [
+    {
+      teamCode: "fr",
+      earnedCents: 875,
+      matchBreakdown: [
+        {
+          stage: "group",
+          oppCode: "de",
+          myScore: 2, oppScore: 1,
+          earnedCents: 325,
+          isWin: true, isDraw: false,
+          matchDate: new Date("2026-06-15T19:00:00Z"),
+          venue: "MetLife Stadium, East Rutherford",
+        },
+        {
+          stage: "r16",
+          oppCode: "nl",
+          myScore: 2, oppScore: 1,
+          earnedCents: 550,
+          isWin: true, isDraw: false,
+          matchDate: new Date("2026-07-01T23:00:00Z"),
+          venue: "SoFi Stadium, Los Angeles",
+        },
+      ],
+    },
+    {
+      teamCode: "mx",
+      earnedCents: 0,
+      matchBreakdown: [
+        {
+          stage: "group",
+          oppCode: "us",
+          myScore: 2, oppScore: 4,
+          earnedCents: 0,
+          isWin: false, isDraw: false,
+          matchDate: new Date("2026-06-14T22:00:00Z"),
+          venue: "AT&T Stadium, Dallas",
+        },
+      ],
+    },
+    { teamCode: "jp", earnedCents: 0, matchBreakdown: [] },
+    { teamCode: "ng", earnedCents: 0, matchBreakdown: [] },
+  ],
+  history: [
+    { id: "mock-hist-1", name: "FIFA World Cup", year: 2022, teamCodes: ["ar", "fr", "hr", "ma"] },
+  ],
+};
+
+// ─── Draft preview mock data ──────────────────────────────────────────────────
+
+const DRAFT_ORDER = [
+  { name: "Anthony", colorIndex: 0 },
+  { name: "Joe",     colorIndex: 1 },
+  { name: "Nico",    colorIndex: 2 },
+  { name: "Angel",   colorIndex: 3 },
+  { name: "Ruben",   colorIndex: 4 },
+  { name: "Spencer", colorIndex: 5 },
+  { name: "Chris",   colorIndex: 6 },
+  { name: "Ricardo", colorIndex: 7 },
+];
+
+// Round 1 (picks 0–7, forward): Anthony→esp, Joe→arg, Nico→fra, Angel→eng, Ruben→bra, Spencer→por, Chris→ned, Ricardo→mar
+// Round 2 (picks 8–11 so far, backward): Ricardo→bel, Chris→ger, Spencer→cro, Ruben→sen
+// Current: Angel's turn (pick 12, round 2 pick 5 of 8, backward order index 3 = Angel)
+const TAKEN_MAP: Record<string, { name: string; colorIndex: number }> = {
+  esp: DRAFT_ORDER[0], arg: DRAFT_ORDER[1], fra: DRAFT_ORDER[2], eng: DRAFT_ORDER[3],
+  bra: DRAFT_ORDER[4], por: DRAFT_ORDER[5], ned: DRAFT_ORDER[6], mar: DRAFT_ORDER[7],
+  bel: DRAFT_ORDER[7], ger: DRAFT_ORDER[6], cro: DRAFT_ORDER[5], sen: DRAFT_ORDER[4],
+};
+
+export const MOCK_DRAFT_TAKEN_CODES = Object.keys(TAKEN_MAP);
+
+export const MOCK_DRAFT_TAKEN_BY: Record<string, { label: string; colorIndex: number }> = Object.fromEntries(
+  Object.entries(TAKEN_MAP).map(([code, p]) => [code, { label: p.name, colorIndex: p.colorIndex }])
+);
+
+export const MOCK_DRAFT_MY_TEAMS = ["esp"];
+
+export const MOCK_DRAFT_ORDER = DRAFT_ORDER.map((p, idx) => ({
+  ...p,
+  picks: Object.values(TAKEN_MAP).filter((v) => v.name === p.name).length,
+  isCurrent: idx === 3, // Angel's turn
+}));
+
+export const MOCK_DRAFT_CURRENT_PICKER = "Angel";
+export const MOCK_DRAFT_ROUND = 2;
+export const MOCK_DRAFT_PICK_IN_ROUND = 5;
+export const MOCK_DRAFT_PLAYER_COUNT = 8;
+
+function seededShuffle<T>(arr: T[], seed: string): T[] {
+  let s = Array.from(seed).reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0) >>> 0;
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    [a[i], a[s % (i + 1)]] = [a[s % (i + 1)], a[i]];
+  }
+  return a;
+}
+
+// Build tiers from real TEAMS data (12 teams per tier in 48-team WC)
+const sortedTeams = TEAMS.slice().sort((a, b) => a.rank - b.rank);
+const tierSize = Math.ceil(sortedTeams.length / 4);
+export const MOCK_DRAFT_TIERS = [0, 1, 2, 3].map((ti) => {
+  const chunk = seededShuffle(sortedTeams.slice(ti * tierSize, (ti + 1) * tierSize), `preview${ti}`);
+  return {
+    key: `tier${ti + 1}`,
+    labelBase: `Tier ${ti + 1}`,
+    label: `Tier ${ti + 1}`,
+    rangeLabel: "",
+    teams: chunk.map((t) => ({ code: t.code, name: t.name, rank: t.rank })),
+  };
+});
