@@ -59,6 +59,21 @@ export const authOptions: NextAuthOptions = {
   },
   events: {},
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // Relative paths are always safe — resolve against baseUrl
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // Same origin as baseUrl — allow
+      if (url.startsWith(baseUrl)) return url;
+      // Extract just the path and resolve against the current baseUrl.
+      // This handles the case where callbackUrl was built against a different
+      // host (e.g. localhost) but the user is accessing via the LAN IP.
+      try {
+        const { pathname, search } = new URL(url);
+        return `${baseUrl}${pathname}${search}`;
+      } catch {
+        return baseUrl;
+      }
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

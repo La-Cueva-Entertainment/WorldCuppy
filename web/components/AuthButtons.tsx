@@ -28,33 +28,10 @@ export function AuthButtons({
           My Profile
         </Link>
 
-        {/* Mobile nav links */}
-        <Link
-          href="/"
-          className="inline-flex h-9 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/20 md:hidden"
-        >
-          Home
-        </Link>
-        <Link
-          href="/standings"
-          className="inline-flex h-9 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/20 md:hidden"
-        >
-          Standings
-        </Link>
-
-        {isAdmin && (
-          <Link
-            href="/admin"
-            className="inline-flex h-9 items-center rounded-xl border border-amber-400/40 bg-amber-400/10 px-3 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-400/20 md:hidden"
-          >
-            Admin
-          </Link>
-        )}
-
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: "/" })}
-          className="inline-flex h-9 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/20"
+          className="hidden md:inline-flex h-9 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/20"
         >
           Sign Out
         </button>

@@ -196,26 +196,3 @@ export const MOCK_DRAFT_ROUND = 2;
 export const MOCK_DRAFT_PICK_IN_ROUND = 5;
 export const MOCK_DRAFT_PLAYER_COUNT = 8;
 
-function seededShuffle<T>(arr: T[], seed: string): T[] {
-  let s = Array.from(seed).reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0) >>> 0;
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
-    [a[i], a[s % (i + 1)]] = [a[s % (i + 1)], a[i]];
-  }
-  return a;
-}
-
-// Build tiers from real TEAMS data (12 teams per tier in 48-team WC)
-const sortedTeams = TEAMS.slice().sort((a, b) => a.rank - b.rank);
-const tierSize = Math.ceil(sortedTeams.length / 4);
-export const MOCK_DRAFT_TIERS = [0, 1, 2, 3].map((ti) => {
-  const chunk = seededShuffle(sortedTeams.slice(ti * tierSize, (ti + 1) * tierSize), `preview${ti}`);
-  return {
-    key: `tier${ti + 1}`,
-    labelBase: `Tier ${ti + 1}`,
-    label: `Tier ${ti + 1}`,
-    rangeLabel: "",
-    teams: chunk.map((t) => ({ code: t.code, name: t.name, rank: t.rank })),
-  };
-});

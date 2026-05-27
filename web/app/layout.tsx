@@ -6,7 +6,9 @@ import { getServerSession } from "next-auth";
 import "./globals.css";
 
 import { AuthButtons } from "@/components/AuthButtons";
+import { MobileNav } from "@/components/MobileNav";
 import { NavLink } from "@/components/NavLink";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -81,19 +83,26 @@ export default async function RootLayout({
             document.documentElement.classList.toggle('dark', t === 'dark');
           } catch(e) {}
         `}} />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#18181b" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="World Cuppy" />
+        <link rel="apple-touch-icon" href="/wcball-icon.png" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ServiceWorkerRegister />
         <div className="min-h-screen">
           {/* Nav — always dark */}
           <div className="sticky top-0 z-30 bg-zinc-900">
-            <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-3">
+            <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-1">
               <Link
                 href="/"
                 aria-label="World Cuppy home"
                 className="flex items-center gap-2"
               >
-                <Image src="/wcball2.png" alt="" width={56} height={56} className="transition-transform duration-200 hover:rotate-12 hover:scale-110" />
-                <span className="hidden text-lg font-bold text-white sm:inline">
+                <Image src="/wcball.png" alt="" width={88} height={88} className="transition-transform duration-200 hover:rotate-12 hover:scale-110" />
+                <span className="text-base font-bold text-white sm:text-lg">
                   World <span className="text-yellow-400">Cuppy</span>
                 </span>
               </Link>
@@ -121,6 +130,9 @@ export default async function RootLayout({
                   picksCount={picksCount}
                   isAdmin={isAdmin || siteOwner}
                 />
+                {session && (
+                  <MobileNav isAdmin={isAdmin || siteOwner} picksCount={picksCount} />
+                )}
               </div>
             </div>
           </div>

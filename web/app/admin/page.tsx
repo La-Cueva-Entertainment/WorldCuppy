@@ -50,7 +50,7 @@ export default async function AdminPage({
   const hdrs = await headers();
   const host = hdrs.get("host") ?? "localhost:3000";
   const proto = hdrs.get("x-forwarded-proto") ?? "http";
-  const siteBase = `${proto}://${host}`;
+  const siteBase = process.env.NEXTAUTH_URL?.replace(/\/$/, "") ?? `${proto}://${host}`;
 
   const userById = new Map(users.map((u) => [u.id, u]));
   // Map tournamentId → Set of enrolled userIds

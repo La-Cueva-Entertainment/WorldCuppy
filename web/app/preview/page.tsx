@@ -14,12 +14,13 @@ import { authOptions } from "@/lib/auth";
 import { isSiteOwner } from "@/lib/siteOwner";
 import { prisma } from "@/lib/prisma";
 import { matchEarningsCents, type MatchResult } from "@/lib/earnings";
+import { buildDraftTiers } from "@/lib/draftTiers";
 import { fetchRss, fmtRelTime } from "@/lib/rss";
 import type { TvMatch, TvPlayer } from "@/components/TournamentView";
 import {
   MOCK_PLAYERS, MOCK_TODAY_MATCHES, MOCK_MATCHES_BY_STAGE,
   MOCK_PROFILE_PROPS,
-  MOCK_DRAFT_TIERS, MOCK_DRAFT_TAKEN_CODES, MOCK_DRAFT_TAKEN_BY,
+  MOCK_DRAFT_TAKEN_CODES, MOCK_DRAFT_TAKEN_BY,
   MOCK_DRAFT_MY_TEAMS, MOCK_DRAFT_ORDER, MOCK_DRAFT_CURRENT_PICKER,
   MOCK_DRAFT_ROUND, MOCK_DRAFT_PICK_IN_ROUND, MOCK_DRAFT_PLAYER_COUNT,
 } from "@/lib/mock-data";
@@ -343,7 +344,7 @@ export default async function PreviewPage({
 
           {/* Team picker board */}
           <TieredTeamsBox
-            tiers={MOCK_DRAFT_TIERS}
+            tiers={buildDraftTiers("preview")}
             takenTeamCodes={MOCK_DRAFT_TAKEN_CODES}
             myTeamCodes={MOCK_DRAFT_MY_TEAMS}
             takenBy={MOCK_DRAFT_TAKEN_BY}

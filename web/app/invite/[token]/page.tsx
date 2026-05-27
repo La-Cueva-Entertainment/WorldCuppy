@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { CountryFlag } from "@/components/CountryFlag";
+import { InstallButton } from "@/components/InstallButton";
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -108,6 +108,11 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         >
           Create an account
         </Link>
+      </div>
+
+      <div className="mt-6 flex flex-col items-center gap-2">
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">Install the app for the best experience</p>
+        <InstallButton />
       </div>
     </main>
   );
