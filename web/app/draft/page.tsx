@@ -2,11 +2,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
+import { CountdownTimer } from "@/components/CountdownTimer";
 import { CountryFlag } from "@/components/CountryFlag";
 import { DraftPickTimer } from "@/components/DraftPickTimer";
 import TieredTeamsBox from "@/components/TieredTeamsBox";
 import { authOptions } from "@/lib/auth";
-import { getSnakeTurnUserId } from "@/lib/draft";
+import { activateDraft, getSnakeTurnUserId } from "@/lib/draft";
 import { buildDraftTiers } from "@/lib/draftTiers";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
@@ -38,7 +39,7 @@ export default async function DraftPage({
   }
   if (!userId) redirect("/login");
 
-  // Active tournament
+  // Active tournament (draft or upcoming)
   const tournament = await prisma.tournament.findFirst({
     where: { status: { in: ["draft", "upcoming"] } },
     orderBy: { createdAt: "desc" },
@@ -49,15 +50,28 @@ export default async function DraftPage({
     return (
       <main className="mx-auto w-full max-w-2xl px-6 py-16 text-center">
         <div className="text-5xl mb-4">🔜</div>
-        <h1 className="text-2xl font-bold text-white">No draft open</h1>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">No draft open</h1>
         <p className="mt-2 text-zinc-400">No tournament is currently in draft mode.</p>
       </main>
     );
   }
 
+  // Auto-activate when draft date has arrived
+  if (
+    tournament.status === "upcoming" &&
+    tournament.draftDate &&
+    new Date() >= tournament.draftDate
+  ) {
+    try {
+      await activateDraft(tournament.id);
+    } catch {
+      // No participants yet or already activated — fall through to render
+    }
+    redirect("/draft");
+  }
+
   const LINEUP_SIZE = tournament.teamsPerPlayer;
 
-  // Fetch draft + picks data
   const [draft, allPicks, allUsers] = await Promise.all([
     prisma.tournamentDraft.findUnique({
       where: { tournamentId: tournament.id },
@@ -66,7 +80,7 @@ export default async function DraftPage({
     prisma.lineupPick.findMany({
       where: { tournamentId: tournament.id },
       orderBy: [{ pickNumber: "asc" }, { createdAt: "asc" }],
-      select: { userId: true, teamCode: true, pickNumber: true },
+      select: { userId: true, teamCode: true, pickNumber: true, createdAt: true },
     }),
     prisma.user.findMany({ select: { id: true, name: true, email: true } }),
   ]);
@@ -87,7 +101,6 @@ export default async function DraftPage({
     : null;
   const canPickNow = Boolean(expectedTurnUserId && expectedTurnUserId === userId);
 
-  // Build owner map for TieredTeamsBox
   const takenBy: Record<string, { label: string; colorIndex: number }> = {};
   for (const p of allPicks) {
     const idx = orderUserIds.indexOf(p.userId);
@@ -132,7 +145,6 @@ export default async function DraftPage({
     const tournamentId = String(formData.get("tournamentId") ?? "").trim();
     const teamCode = String(formData.get("teamCode") ?? "").trim();
     if (!tournamentId || !teamCode) redirectDraft();
-
     if (!TEAMS_BY_CODE.has(teamCode)) redirectDraft("Unknown team");
 
     try {
@@ -168,11 +180,16 @@ export default async function DraftPage({
           select: { id: true },
         });
 
-        const updated = await tx.tournamentDraft.updateMany({
+        const nextPick = draft.currentPick + 1;
+        const isLastPick = nextPick >= maxPicks;
+
+        await tx.tournamentDraft.updateMany({
           where: { tournamentId, currentPick: draft.currentPick },
-          data: { currentPick: { increment: 1 } },
+          data: {
+            currentPick: { increment: 1 },
+            ...(isLastPick ? { status: "complete" } : {}),
+          },
         });
-        if (updated.count !== 1) throw new Error("RACE");
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
@@ -202,6 +219,8 @@ export default async function DraftPage({
       })()
     : null;
 
+  const draftComplete = draft?.status === "complete" || (maxPicks > 0 && currentPick >= maxPicks);
+
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
       {/* Header */}
@@ -215,14 +234,14 @@ export default async function DraftPage({
           </p>
         </div>
 
-        {!draftActive && tournament.draftDate && (
+        {!draftActive && !draftComplete && tournament.draftDate && (
           <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-5 py-3">
             <div className="text-xs text-zinc-500 dark:text-zinc-400">Draft scheduled</div>
             <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
               {tournament.draftDate.toLocaleString("en-US", {
                 timeZone: "America/Los_Angeles",
                 weekday: "long", month: "long", day: "numeric",
-                hour: "numeric", minute: "2-digit", hour12: true, timeZoneName: "short"
+                hour: "numeric", minute: "2-digit", hour12: true, timeZoneName: "short",
               })}
             </div>
           </div>
@@ -254,40 +273,72 @@ export default async function DraftPage({
             )}
           </div>
 
-          {/* Draft order */}
+          {/* Draft order — reversed on backward rounds so the active picker is always at the left */}
           <div className="mb-6 flex flex-wrap gap-2">
-            {orderUserIds.map((uid, idx) => {
-              const u = userById.get(uid);
-              const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
-              const isCurrent = draftActive && idx === (currentPick % orderUserIds.length)
-                && Math.floor(currentPick / orderUserIds.length) % 2 === 0
-                  ? idx === currentPick % orderUserIds.length
-                  : idx === orderUserIds.length - 1 - (currentPick % orderUserIds.length);
-              const colorKey = MANAGER_COLORS[idx % MANAGER_COLORS.length];
-              return (
-                <div
-                  key={uid}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
-                    isCurrent
-                      ? `bg-${colorKey}-500/25 ring-${colorKey}-500/60 text-${colorKey}-700 dark:text-${colorKey}-200 animate-pulse`
-                      : `bg-${colorKey}-500/10 ring-${colorKey}-500/20 text-${colorKey}-700 dark:text-${colorKey}-300`
-                  }`}
-                >
-                  {name} ({allPicks.filter((p) => p.userId === uid).length}/{LINEUP_SIZE})
-                </div>
-              );
-            })}
+            {(() => {
+              const round = Math.floor(currentPick / orderUserIds.length);
+              const forward = round % 2 === 0;
+              const displayIds = forward ? orderUserIds : [...orderUserIds].reverse();
+              return displayIds.map((uid) => {
+                const originalIdx = orderUserIds.indexOf(uid);
+                const isCurrent = uid === expectedTurnUserId;
+                const colorKey = MANAGER_COLORS[originalIdx % MANAGER_COLORS.length];
+                const u = userById.get(uid);
+                const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
+                return (
+                  <div
+                    key={uid}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                      isCurrent
+                        ? `bg-${colorKey}-500/25 ring-${colorKey}-500/60 text-${colorKey}-700 dark:text-${colorKey}-200 animate-pulse`
+                        : `bg-${colorKey}-500/10 ring-${colorKey}-500/20 text-${colorKey}-700 dark:text-${colorKey}-300`
+                    }`}
+                  >
+                    {name} ({allPicks.filter((p) => p.userId === uid).length}/{LINEUP_SIZE})
+                  </div>
+                );
+              });
+            })()}
           </div>
         </>
       ) : (
         <div className="mb-6 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            {draft?.status === "complete" || (maxPicks > 0 && currentPick >= maxPicks)
+            {draftComplete
               ? "Draft is complete! Check the standings."
               : orderUserIds.length === 0
                 ? "No participants enrolled yet. An admin needs to set up the draft."
-                : "Draft has not started yet. Waiting for admin to begin."}
+                : "Draft has not started yet. Waiting for the scheduled time."}
           </p>
+
+          {/* Countdown to draft start */}
+          {!draftComplete && tournament.draftDate && (
+            <div className="mt-4">
+              <CountdownTimer
+                targetISO={tournament.draftDate.toISOString()}
+                label={`${tournament.name} ${tournament.year} Draft`}
+              />
+            </div>
+          )}
+
+          {/* Show draft order if known (upcoming but draft record exists) */}
+          {!draftComplete && orderUserIds.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {orderUserIds.map((uid, idx) => {
+                const u = userById.get(uid);
+                const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
+                const colorKey = MANAGER_COLORS[idx % MANAGER_COLORS.length];
+                return (
+                  <div
+                    key={uid}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 bg-${colorKey}-500/10 ring-${colorKey}-500/20 text-${colorKey}-700 dark:text-${colorKey}-300`}
+                  >
+                    {idx + 1}. {name}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -309,6 +360,43 @@ export default async function DraftPage({
           <input type="hidden" name="tournamentId" value={tournament.id} />
         }
       />
+
+      {/* Pick history — pick 1 first. Mobile: 2-col row-major. sm+: column-major (8/col). */}
+      {allPicks.length > 0 && (() => {
+        const pickCards = allPicks.map((p) => {
+          const u = userById.get(p.userId);
+          const playerName = u?.name ?? u?.email?.split("@")[0] ?? "?";
+          const team = TEAMS_BY_CODE.get(p.teamCode);
+          const idx = orderUserIds.indexOf(p.userId);
+          const colorKey = MANAGER_COLORS[idx >= 0 ? idx % MANAGER_COLORS.length : 0];
+          return (
+            <div
+              key={`${p.userId}-${p.teamCode}`}
+              className="flex items-center gap-1.5 rounded-lg bg-zinc-50 dark:bg-white/5 px-2 py-1"
+            >
+              <span className="w-5 shrink-0 text-right text-[9px] tabular-nums text-zinc-400 dark:text-zinc-600">#{(p.pickNumber ?? 0) + 1}</span>
+              <CountryFlag code={p.teamCode} label={team?.name ?? p.teamCode} className="h-3 w-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-900 dark:text-white">
+                {team?.name ?? p.teamCode.toUpperCase()}
+              </span>
+              <span className={`shrink-0 text-[9px] font-semibold text-${colorKey}-600 dark:text-${colorKey}-400`}>
+                {playerName}
+              </span>
+            </div>
+          );
+        });
+        return (
+          <section className="mt-8">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+              Pick History
+            </h2>
+            {/* Mobile: 2-col row-major */}
+            <div className="grid grid-cols-2 gap-1 sm:hidden">{pickCards}</div>
+            {/* Desktop: 4-col column-major, 8 rows deep */}
+            <div className="hidden sm:grid sm:grid-flow-col gap-1" style={{ gridTemplateRows: "repeat(8, auto)" }}>{pickCards}</div>
+          </section>
+        );
+      })()}
     </main>
   );
 }

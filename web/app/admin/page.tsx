@@ -5,8 +5,10 @@ import { getServerSession } from "next-auth";
 import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
 import { CopyButton } from "@/components/CopyButton";
 import { authOptions } from "@/lib/auth";
+import { activateDraft, resetDraftOrder } from "@/lib/draft";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
+import { TEAMS } from "@/lib/teams";
 import { headers } from "next/headers";
 
 async function requireAdmin() {
@@ -39,13 +41,18 @@ export default async function AdminPage({
 
   const resolved = searchParams ? await Promise.resolve(searchParams) : {};
 
-  const [tournaments, users, allParticipants] = await Promise.all([
-    prisma.tournament.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true, year: true, type: true, status: true, draftDate: true, inviteToken: true } }),
+  const [tournaments, users, allParticipants, allDrafts, pickCountsRaw] = await Promise.all([
+    prisma.tournament.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true, year: true, type: true, status: true, draftDate: true, inviteToken: true, teamsPerPlayer: true } }),
     prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, email: true, isAdmin: true } }),
     prisma.tournamentParticipant.findMany({ select: { tournamentId: true, userId: true } }),
+    prisma.tournamentDraft.findMany({ select: { tournamentId: true, status: true, currentPick: true, orderUserIds: true } }),
+    prisma.lineupPick.groupBy({ by: ["tournamentId"], _count: { id: true } }),
   ]);
 
   const activeTournament = tournaments.find((t) => ["draft", "active"].includes(t.status)) ?? null;
+
+  const draftByTournament = new Map(allDrafts.map((d) => [d.tournamentId, d]));
+  const pickCountByTournament = new Map(pickCountsRaw.map((r) => [r.tournamentId, r._count.id]));
 
   const hdrs = await headers();
   const host = hdrs.get("host") ?? "localhost:3000";
@@ -135,13 +142,57 @@ export default async function AdminPage({
     redirect("/admin?msg=Tournament+deleted");
   }
 
+  async function startDraftAction(formData: FormData) {
+    "use server";
+    await requireAdmin();
+    const tournamentId = String(formData.get("tournamentId") ?? "").trim();
+    if (!tournamentId) redirect("/admin");
+    try {
+      await activateDraft(tournamentId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg === "NO_PARTICIPANTS") redirect("/admin?error=No+participants+enrolled+yet");
+      redirect("/admin?error=Could+not+start+draft");
+    }
+    redirect("/admin?msg=Draft+started");
+  }
+
+  async function setTournamentStatusAction(formData: FormData) {
+    "use server";
+    await requireAdmin();
+    const tournamentId = String(formData.get("tournamentId") ?? "").trim();
+    const status = String(formData.get("status") ?? "").trim();
+    if (!tournamentId || !status) redirect("/admin");
+    const allowed = ["upcoming", "draft", "active", "complete"];
+    if (!allowed.includes(status)) redirect("/admin?error=Invalid+status");
+    await prisma.tournament.update({ where: { id: tournamentId }, data: { status } });
+    redirect("/admin?msg=Status+updated");
+  }
+
+  async function resetDraftAction(formData: FormData) {
+    "use server";
+    await requireAdmin();
+    const tournamentId = String(formData.get("tournamentId") ?? "").trim();
+    if (!tournamentId) redirect("/admin");
+    try {
+      await resetDraftOrder(tournamentId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg === "PICKS_MADE") redirect("/admin?error=Cannot+re-randomize+after+picks+are+made");
+      if (msg === "NO_DRAFT") redirect("/admin?error=No+draft+record+found");
+      redirect("/admin?error=Could+not+re-randomize");
+    }
+    redirect("/admin?msg=Draft+order+re-randomized");
+  }
+
   async function toggleAdminAction(formData: FormData) {
     "use server";
     await requireAdmin();
     const uid = String(formData.get("userId") ?? "").trim();
-    const current = formData.get("currentAdmin") === "true";
     if (!uid) redirect("/admin");
-    await prisma.user.update({ where: { id: uid }, data: { isAdmin: !current } });
+    const target = await prisma.user.findUnique({ where: { id: uid }, select: { isAdmin: true } });
+    if (!target) redirect("/admin?error=User+not+found");
+    await prisma.user.update({ where: { id: uid }, data: { isAdmin: !target.isAdmin } });
     redirect("/admin?msg=Admin+updated");
   }
 
@@ -206,6 +257,10 @@ export default async function AdminPage({
             const enrolled = participantsByTournament.get(t.id) ?? new Set<string>();
             const enrolledUsers = [...enrolled].map((uid) => userById.get(uid)).filter(Boolean);
             const unenrolled = users.filter((u) => !enrolled.has(u.id));
+            const draftRecord = draftByTournament.get(t.id);
+            const pickCount = pickCountByTournament.get(t.id) ?? 0;
+            const draftOrderIds = (draftRecord?.orderUserIds as string[] | undefined) ?? [];
+            const maxPicks = Math.min(enrolled.size * t.teamsPerPlayer, TEAMS.length);
             return (
               <div key={t.id} className="rounded-xl border border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 px-4 py-3 text-sm space-y-3">
                 {/* Header row */}
@@ -305,6 +360,81 @@ export default async function AdminPage({
                     </form>
                   )}
                 </div>
+
+                {/* Draft controls row */}
+                <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 dark:border-white/5 pt-2">
+                  <span className="text-xs text-zinc-500 dark:text-zinc-500 shrink-0">Draft:</span>
+
+                  {t.status === "upcoming" && !draftRecord && (
+                    <>
+                      <span className="text-xs text-zinc-400 dark:text-zinc-600">
+                        {enrolled.size === 0
+                          ? "Enroll players to enable draft"
+                          : `${enrolled.size} player${enrolled.size !== 1 ? "s" : ""} enrolled — ready to draft`}
+                      </span>
+                      {enrolled.size >= 1 && (
+                        <form action={startDraftAction}>
+                          <input type="hidden" name="tournamentId" value={t.id} />
+                          <button type="submit" className="h-7 rounded-lg bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-600">
+                            Start Draft Now
+                          </button>
+                        </form>
+                      )}
+                    </>
+                  )}
+
+                  {t.status === "upcoming" && draftRecord && (
+                    <span className="text-xs text-zinc-400 dark:text-zinc-600 italic">Draft record exists (will activate at scheduled time)</span>
+                  )}
+
+                  {t.status === "draft" && draftRecord && (
+                    <>
+                      <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                        Pick {draftRecord.currentPick} of {maxPicks}
+                        {pickCount === 0 && " · no picks yet"}
+                      </span>
+                      {draftOrderIds.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {draftOrderIds.map((uid, idx) => {
+                            const u = userById.get(uid);
+                            return (
+                              <span key={uid} className="rounded-full bg-zinc-200 dark:bg-white/10 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+                                {idx + 1}. {u?.name ?? u?.email ?? "?"}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {pickCount === 0 && (
+                        <form action={resetDraftAction}>
+                          <input type="hidden" name="tournamentId" value={t.id} />
+                          <button type="submit" className={`h-7 ${ghostBtn}`}>Re-randomize</button>
+                        </form>
+                      )}
+                      <form action={setTournamentStatusAction}>
+                        <input type="hidden" name="tournamentId" value={t.id} />
+                        <input type="hidden" name="status" value="active" />
+                        <button type="submit" className="h-7 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700">
+                          Set Active →
+                        </button>
+                      </form>
+                    </>
+                  )}
+
+                  {t.status === "active" && (
+                    <form action={setTournamentStatusAction}>
+                      <input type="hidden" name="tournamentId" value={t.id} />
+                      <input type="hidden" name="status" value="complete" />
+                      <button type="submit" className="h-7 rounded-lg bg-sky-600 px-3 text-xs font-semibold text-white hover:bg-sky-700">
+                        Complete Tournament
+                      </button>
+                    </form>
+                  )}
+
+                  {t.status === "complete" && (
+                    <span className="text-xs text-sky-600 dark:text-sky-400 font-semibold">Tournament complete</span>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -363,7 +493,6 @@ export default async function AdminPage({
               {u.isAdmin && <span className="rounded-full bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">admin</span>}
               <form action={toggleAdminAction}>
                 <input type="hidden" name="userId" value={u.id} />
-                <input type="hidden" name="currentAdmin" value={String(u.isAdmin)} />
                 <button type="submit" className={`h-7 ${ghostBtn}`}>
                   {u.isAdmin ? "Revoke admin" : "Make admin"}
                 </button>

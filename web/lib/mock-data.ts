@@ -196,3 +196,19 @@ export const MOCK_DRAFT_ROUND = 2;
 export const MOCK_DRAFT_PICK_IN_ROUND = 5;
 export const MOCK_DRAFT_PLAYER_COUNT = 8;
 
+// Pick history — newest first
+export const MOCK_DRAFT_PICK_HISTORY = [
+  { pickNumber: 11, playerName: "Ruben",   colorIndex: 4, teamCode: "sen", teamName: "Senegal",     pickedAt: "Jun 5, 2:11 PM" },
+  { pickNumber: 10, playerName: "Spencer", colorIndex: 5, teamCode: "cro", teamName: "Croatia",     pickedAt: "Jun 5, 2:10 PM" },
+  { pickNumber: 9,  playerName: "Chris",   colorIndex: 6, teamCode: "ger", teamName: "Germany",     pickedAt: "Jun 5, 2:09 PM" },
+  { pickNumber: 8,  playerName: "Ricardo", colorIndex: 7, teamCode: "bel", teamName: "Belgium",     pickedAt: "Jun 5, 2:08 PM" },
+  { pickNumber: 7,  playerName: "Ricardo", colorIndex: 7, teamCode: "mar", teamName: "Morocco",     pickedAt: "Jun 5, 2:07 PM" },
+  { pickNumber: 6,  playerName: "Chris",   colorIndex: 6, teamCode: "ned", teamName: "Netherlands", pickedAt: "Jun 5, 2:06 PM" },
+  { pickNumber: 5,  playerName: "Spencer", colorIndex: 5, teamCode: "por", teamName: "Portugal",    pickedAt: "Jun 5, 2:05 PM" },
+  { pickNumber: 4,  playerName: "Ruben",   colorIndex: 4, teamCode: "bra", teamName: "Brazil",      pickedAt: "Jun 5, 2:04 PM" },
+  { pickNumber: 3,  playerName: "Angel",   colorIndex: 3, teamCode: "eng", teamName: "England",     pickedAt: "Jun 5, 2:03 PM" },
+  { pickNumber: 2,  playerName: "Nico",    colorIndex: 2, teamCode: "fra", teamName: "France",      pickedAt: "Jun 5, 2:02 PM" },
+  { pickNumber: 1,  playerName: "Joe",     colorIndex: 1, teamCode: "arg", teamName: "Argentina",   pickedAt: "Jun 5, 2:01 PM" },
+  { pickNumber: 0,  playerName: "Anthony", colorIndex: 0, teamCode: "esp", teamName: "Spain",       pickedAt: "Jun 5, 2:00 PM" },
+];
+

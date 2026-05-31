@@ -30,7 +30,7 @@ export function AuthButtons({
 
         <button
           type="button"
-          onClick={() => signOut({ callbackUrl: "/" })}
+          onClick={async () => { await signOut({ redirect: false }); window.location.href = "/"; }}
           className="hidden md:inline-flex h-9 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-xs font-medium text-white transition-colors hover:bg-white/20"
         >
           Sign Out

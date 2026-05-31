@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
 import TournamentView from "@/components/TournamentView";
+import { CountdownTimer } from "@/components/CountdownTimer";
 import { CountryFlag } from "@/components/CountryFlag";
+import { DraftPickTimer } from "@/components/DraftPickTimer";
 import { PreviewSelector } from "@/components/PreviewSelector";
 import ProfileContent from "@/components/ProfileContent";
 import TieredTeamsBox from "@/components/TieredTeamsBox";
@@ -23,6 +25,7 @@ import {
   MOCK_DRAFT_TAKEN_CODES, MOCK_DRAFT_TAKEN_BY,
   MOCK_DRAFT_MY_TEAMS, MOCK_DRAFT_ORDER, MOCK_DRAFT_CURRENT_PICKER,
   MOCK_DRAFT_ROUND, MOCK_DRAFT_PICK_IN_ROUND, MOCK_DRAFT_PLAYER_COUNT,
+  MOCK_DRAFT_PICK_HISTORY,
 } from "@/lib/mock-data";
 
 const STAGE_LABELS: Record<string, string> = {
@@ -43,14 +46,25 @@ const PLAYER_COLORS = [
 
 // These must match TieredTeamsBox's OWNER_BADGE_STYLES order
 const DRAFT_BADGE_CLASSES = [
-  "bg-rose-500/10 ring-rose-500/30 text-rose-800 dark:text-rose-200",
-  "bg-amber-500/10 ring-amber-500/30 text-amber-800 dark:text-amber-200",
-  "bg-lime-500/10 ring-lime-500/30 text-lime-800 dark:text-lime-200",
-  "bg-emerald-500/10 ring-emerald-500/30 text-emerald-800 dark:text-emerald-200",
-  "bg-cyan-500/10 ring-cyan-500/30 text-cyan-800 dark:text-cyan-200",
-  "bg-sky-500/10 ring-sky-500/30 text-sky-800 dark:text-sky-200",
-  "bg-indigo-500/10 ring-indigo-500/30 text-indigo-800 dark:text-indigo-200",
-  "bg-fuchsia-500/10 ring-fuchsia-500/30 text-fuchsia-800 dark:text-fuchsia-200",
+  "bg-rose-500/10 ring-rose-500/20 text-rose-700 dark:text-rose-300",
+  "bg-amber-500/10 ring-amber-500/20 text-amber-700 dark:text-amber-300",
+  "bg-lime-500/10 ring-lime-500/20 text-lime-700 dark:text-lime-300",
+  "bg-emerald-500/10 ring-emerald-500/20 text-emerald-700 dark:text-emerald-300",
+  "bg-cyan-500/10 ring-cyan-500/20 text-cyan-700 dark:text-cyan-300",
+  "bg-sky-500/10 ring-sky-500/20 text-sky-700 dark:text-sky-300",
+  "bg-indigo-500/10 ring-indigo-500/20 text-indigo-700 dark:text-indigo-300",
+  "bg-fuchsia-500/10 ring-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300",
+];
+
+const DRAFT_ACTIVE_BADGE_CLASSES = [
+  "bg-rose-500/25 ring-rose-500/60 text-rose-700 dark:text-rose-200",
+  "bg-amber-500/25 ring-amber-500/60 text-amber-700 dark:text-amber-200",
+  "bg-lime-500/25 ring-lime-500/60 text-lime-700 dark:text-lime-200",
+  "bg-emerald-500/25 ring-emerald-500/60 text-emerald-700 dark:text-emerald-200",
+  "bg-cyan-500/25 ring-cyan-500/60 text-cyan-700 dark:text-cyan-200",
+  "bg-sky-500/25 ring-sky-500/60 text-sky-700 dark:text-sky-200",
+  "bg-indigo-500/25 ring-indigo-500/60 text-indigo-700 dark:text-indigo-200",
+  "bg-fuchsia-500/25 ring-fuchsia-500/60 text-fuchsia-700 dark:text-fuchsia-200",
 ];
 
 function fmtTime(iso: string | null | undefined): string | null {
@@ -219,7 +233,7 @@ export default async function PreviewPage({
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">
-                      Draft Open
+                      Coming Up
                     </div>
                     <h2 className="text-2xl font-extrabold text-zinc-900 dark:text-white">
                       FIFA World Cup <span className="text-emerald-600 dark:text-emerald-400">2026</span>
@@ -234,6 +248,9 @@ export default async function PreviewPage({
                   >
                     Open Draft →
                   </Link>
+                </div>
+                <div className="mt-5">
+                  <CountdownTimer targetISO="2026-06-05T21:00:00.000Z" label="FIFA World Cup 2026 Draft" />
                 </div>
               </section>
 
@@ -273,6 +290,7 @@ export default async function PreviewPage({
                             ) : (
                               <span className="text-xs text-zinc-400 dark:text-zinc-500">vs</span>
                             )}
+                            {m.penaltyWinner && <div className="text-[10px] text-amber-600 dark:text-amber-400">pens</div>}
                           </div>
                           <div className={`flex min-w-0 flex-1 flex-row-reverse items-center gap-1.5 ${m.played && !awayWon ? "opacity-50" : ""}`}>
                             <CountryFlag code={m.awayTeam} label={m.awayTeamName} className="h-5 w-7 shrink-0" />
@@ -314,32 +332,45 @@ export default async function PreviewPage({
               </h1>
               <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">4 teams per player · snake draft</p>
             </div>
+            <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-5 py-3">
+              <div className="text-xs text-zinc-500 dark:text-zinc-400">Draft scheduled</div>
+              <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                Thursday, June 5, 2:00 PM PDT
+              </div>
+            </div>
           </div>
 
           {/* Draft status bar */}
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-500 mb-0.5">Now Picking</div>
-              <div className="text-lg font-bold text-zinc-900 dark:text-white">{MOCK_DRAFT_CURRENT_PICKER}</div>
+              <div className="text-lg font-bold text-zinc-900 dark:text-white">Your turn! 🎉</div>
               <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Round {MOCK_DRAFT_ROUND} · Pick {MOCK_DRAFT_PICK_IN_ROUND} of {MOCK_DRAFT_PLAYER_COUNT}
               </div>
             </div>
+            <DraftPickTimer seconds={60} key={12} />
           </div>
 
-          {/* Draft order badges */}
+          {/* Draft order badges — reversed on backward rounds */}
           <div className="mb-6 flex flex-wrap gap-2">
-            {MOCK_DRAFT_ORDER.map((player) => {
-              const cls = DRAFT_BADGE_CLASSES[player.colorIndex % DRAFT_BADGE_CLASSES.length];
-              return (
-                <div
-                  key={player.name}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${cls} ${player.isCurrent ? "animate-pulse" : ""}`}
-                >
-                  {player.name} ({player.picks}/4)
-                </div>
-              );
-            })}
+            {(() => {
+              const forward = (MOCK_DRAFT_ROUND - 1) % 2 === 0;
+              const displayOrder = forward ? MOCK_DRAFT_ORDER : [...MOCK_DRAFT_ORDER].reverse();
+              return displayOrder.map((player) => {
+                const cls = player.isCurrent
+                  ? DRAFT_ACTIVE_BADGE_CLASSES[player.colorIndex % DRAFT_ACTIVE_BADGE_CLASSES.length]
+                  : DRAFT_BADGE_CLASSES[player.colorIndex % DRAFT_BADGE_CLASSES.length];
+                return (
+                  <div
+                    key={player.name}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${cls} ${player.isCurrent ? "animate-pulse" : ""}`}
+                  >
+                    {player.name} ({player.picks}/4)
+                  </div>
+                );
+              });
+            })()}
           </div>
 
           {/* Team picker board */}
@@ -355,6 +386,41 @@ export default async function PreviewPage({
             showDraftControls={false}
             showRanks={false}
           />
+
+          {/* Pick history — all picks, 4 columns, pick 1 first */}
+          <section className="mt-8">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+              Pick History
+            </h2>
+            {/* Mobile: 2-col row-major. sm+: column-major 4 cols × 8 rows. */}
+            <div className="grid grid-cols-2 gap-1 sm:hidden">
+              {[...MOCK_DRAFT_PICK_HISTORY].reverse().map((p) => (
+                <div key={`m-${p.pickNumber}`} className="flex items-center gap-1.5 rounded-lg bg-zinc-50 dark:bg-white/5 px-2 py-1">
+                  <span className="w-5 shrink-0 text-right text-[9px] tabular-nums text-zinc-400 dark:text-zinc-600">#{p.pickNumber + 1}</span>
+                  <CountryFlag code={p.teamCode} label={p.teamName} className="h-3 w-4 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-900 dark:text-white">{p.teamName}</span>
+                  <span className={`shrink-0 text-[9px] font-semibold ${["text-rose-600 dark:text-rose-400","text-amber-600 dark:text-amber-400","text-lime-600 dark:text-lime-400","text-emerald-600 dark:text-emerald-400","text-cyan-600 dark:text-cyan-400","text-sky-600 dark:text-sky-400","text-indigo-600 dark:text-indigo-400","text-fuchsia-600 dark:text-fuchsia-400"][p.colorIndex % 8]}`}>{p.playerName}</span>
+                </div>
+              ))}
+            </div>
+            <div className="hidden sm:grid sm:grid-flow-col gap-1" style={{ gridTemplateRows: "repeat(8, auto)" }}>
+              {[...MOCK_DRAFT_PICK_HISTORY].reverse().map((p) => (
+                <div
+                  key={p.pickNumber}
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-50 dark:bg-white/5 px-2 py-1"
+                >
+                  <span className="w-5 shrink-0 text-right text-[9px] tabular-nums text-zinc-400 dark:text-zinc-600">#{p.pickNumber + 1}</span>
+                  <CountryFlag code={p.teamCode} label={p.teamName} className="h-3 w-4 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-900 dark:text-white">{p.teamName}</span>
+                  <span className={`shrink-0 text-[9px] font-semibold ${
+                    ["text-rose-600 dark:text-rose-400","text-amber-600 dark:text-amber-400","text-lime-600 dark:text-lime-400","text-emerald-600 dark:text-emerald-400","text-cyan-600 dark:text-cyan-400","text-sky-600 dark:text-sky-400","text-indigo-600 dark:text-indigo-400","text-fuchsia-600 dark:text-fuchsia-400"][p.colorIndex % 8]
+                  }`}>
+                    {p.playerName}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
         </main>
       )}
 
