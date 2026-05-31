@@ -25,6 +25,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXTAUTH_URL ?? "https://worldcuppy.lacueva.us"),
   title: "World Cuppy",
   description: "International Fantasy Fútbol - Draft Nations",
 };

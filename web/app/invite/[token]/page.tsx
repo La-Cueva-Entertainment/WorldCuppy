@@ -20,6 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
       title: `Join ${tournament.name} ${tournament.year}`,
       description: `You've been invited to the fantasy draft!`,
       type: "website",
+      images: [`/invite/${token}/opengraph-image`],
     },
   };
 }
