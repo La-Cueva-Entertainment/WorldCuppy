@@ -138,6 +138,14 @@ export default async function AdminPage({
     await requireAdmin();
     const id = String(formData.get("id") ?? "").trim();
     if (!id) redirect("/admin");
+    const [tournament, picks] = await Promise.all([
+      prisma.tournament.findUnique({ where: { id }, select: { status: true } }),
+      prisma.lineupPick.count({ where: { tournamentId: id } }),
+    ]);
+    if (!tournament) redirect("/admin?error=Tournament+not+found");
+    if (tournament.status !== "upcoming" || picks > 0) {
+      redirect("/admin?error=Cannot+delete+a+tournament+with+picks+or+past+upcoming+status");
+    }
     await prisma.tournament.delete({ where: { id } });
     redirect("/admin?msg=Tournament+deleted");
   }
@@ -286,15 +294,21 @@ export default async function AdminPage({
                     />
                     <button type="submit" className={`h-8 ${ghostBtn}`}>Save</button>
                   </form>
-                  <form action={deleteTournamentAction}>
-                    <input type="hidden" name="id" value={t.id} />
-                    <ConfirmSubmitButton
-                      confirmText={`Delete "${t.name} ${t.year}"? This will permanently remove all picks, matches, and draft data.`}
-                      className="h-8 rounded-lg bg-rose-50 dark:bg-rose-500/10 px-3 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 ring-1 ring-rose-200 dark:ring-rose-500/20"
-                    >
-                      Delete
-                    </ConfirmSubmitButton>
-                  </form>
+                  {t.status === "upcoming" && pickCount === 0 ? (
+                    <form action={deleteTournamentAction}>
+                      <input type="hidden" name="id" value={t.id} />
+                      <ConfirmSubmitButton
+                        confirmText={`Delete "${t.name} ${t.year}"?`}
+                        className="h-8 rounded-lg bg-rose-50 dark:bg-rose-500/10 px-3 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 ring-1 ring-rose-200 dark:ring-rose-500/20"
+                      >
+                        Delete
+                      </ConfirmSubmitButton>
+                    </form>
+                  ) : (
+                    <span className="text-xs text-zinc-400 dark:text-zinc-600 italic" title="Tournaments with picks or active/complete status cannot be deleted here.">
+                      🔒 Locked
+                    </span>
+                  )}
                 </div>
 
                 {/* Invite link row */}
