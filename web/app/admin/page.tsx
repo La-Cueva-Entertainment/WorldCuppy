@@ -8,6 +8,7 @@ import DraftOrderPicker from "@/components/DraftOrderPicker";
 import { authOptions } from "@/lib/auth";
 import { postDraftStarted } from "@/lib/discord";
 import { activateDraft, resetDraftOrder } from "@/lib/draft";
+import { DEFAULT_PAYOUT_RULES, resolvePayoutRules, type PayoutRules } from "@/lib/earnings";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
 import { TEAMS } from "@/lib/teams";
@@ -44,7 +45,7 @@ export default async function AdminPage({
   const resolved = searchParams ? await Promise.resolve(searchParams) : {};
 
   const [tournaments, users, allParticipants, allDrafts, pickCountsRaw] = await Promise.all([
-    prisma.tournament.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true, year: true, type: true, status: true, draftDate: true, inviteToken: true, teamsPerPlayer: true, pickSeconds: true } }),
+    prisma.tournament.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true, year: true, type: true, status: true, draftDate: true, inviteToken: true, teamsPerPlayer: true, pickSeconds: true, payoutRules: true } }),
     prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, email: true, isAdmin: true } }),
     prisma.tournamentParticipant.findMany({ select: { tournamentId: true, userId: true } }),
     prisma.tournamentDraft.findMany({ select: { tournamentId: true, status: true, currentPick: true, orderUserIds: true } }),
@@ -254,6 +255,24 @@ export default async function AdminPage({
       prisma.tournament.update({ where: { id }, data: { status: "upcoming" } }),
     ]);
     redirect("/admin?msg=Tournament+reset+to+upcoming");
+  }
+
+  async function setPayoutRulesAction(formData: FormData) {
+    "use server";
+    await requireAdmin();
+    const id = String(formData.get("id") ?? "").trim();
+    if (!id) redirect("/admin");
+    const keys = Object.keys(DEFAULT_PAYOUT_RULES) as (keyof PayoutRules)[];
+    const partial: Partial<PayoutRules> = {};
+    for (const key of keys) {
+      const raw = String(formData.get(key) ?? "").trim();
+      const dollars = parseFloat(raw);
+      if (!isNaN(dollars) && dollars >= 0) {
+        partial[key] = Math.round(dollars * 100) as never;
+      }
+    }
+    await prisma.tournament.update({ where: { id }, data: { payoutRules: partial } });
+    redirect("/admin?msg=Payout+rules+saved");
   }
 
   async function setPickSecondsAction(formData: FormData) {    "use server";
@@ -572,6 +591,65 @@ export default async function AdminPage({
                     <span className="text-xs text-sky-600 dark:text-sky-400 font-semibold">Tournament complete</span>
                   )}
                 </div>
+
+                {/* Payout Rules row */}
+                {(() => {
+                  const pr = resolvePayoutRules(t.payoutRules as Partial<PayoutRules> | null);
+                  const isWC = t.type === "world_cup";
+                  type RuleField = { key: keyof PayoutRules; label: string; show?: boolean };
+                  const fields: RuleField[] = [
+                    { key: "groupWinBase",          label: "Group Win ($)" },
+                    { key: "groupWinGdPer",         label: "Group Win GD/goal ($)" },
+                    { key: "groupDraw",             label: "Group Draw ($)" },
+                    { key: "r32WinBase",            label: "R32 Win ($)", show: isWC },
+                    { key: "r32WinGdPer",           label: "R32 GD/goal ($)", show: isWC },
+                    { key: "r16WinBase",            label: "R16 Win ($)" },
+                    { key: "r16WinGdPer",           label: "R16 GD/goal ($)" },
+                    { key: "qfWinBase",             label: "QF Win ($)" },
+                    { key: "qfWinGdPer",            label: "QF GD/goal ($)" },
+                    { key: "sfWinBase",             label: "SF Win ($)" },
+                    { key: "sfWinGdPerWC",          label: "SF GD/goal WC ($)", show: isWC },
+                    { key: "sfWinGdPerEuros",       label: "SF GD/goal Euros ($)", show: !isWC },
+                    { key: "thirdWinBase",          label: "3rd Win ($)", show: isWC },
+                    { key: "thirdWinGdPer",         label: "3rd GD/goal ($)", show: isWC },
+                    { key: "finalWinnerBase",       label: "Final Winner ($)" },
+                    { key: "finalWinnerGoalPer",    label: "Final Winner goal ($)" },
+                    { key: "finalRunnerUpBase",     label: "Final Runner-up ($)" },
+                    { key: "finalRunnerUpGoalPer",  label: "Final Runner-up goal ($)" },
+                  ];
+                  return (
+                    <div className="border-t border-zinc-100 dark:border-white/5 pt-2">
+                      <details className="group">
+                        <summary className="cursor-pointer list-none text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 select-none flex items-center gap-1">
+                          <span className="group-open:hidden">▶</span><span className="hidden group-open:inline">▼</span>
+                          💰 Payout Rules
+                        </summary>
+                        <form action={setPayoutRulesAction} className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          <input type="hidden" name="id" value={t.id} />
+                          {fields.filter((f) => f.show !== false).map((f) => (
+                            <div key={f.key} className="flex items-center gap-2">
+                              <label className="w-40 shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{f.label}</label>
+                              <input
+                                name={f.key}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                defaultValue={(pr[f.key] / 100).toFixed(2)}
+                                className={`${input} w-24`}
+                              />
+                            </div>
+                          ))}
+                          <div className="col-span-full flex gap-2 mt-1">
+                            <button type="submit" className="h-8 rounded-lg bg-emerald-600 px-4 text-xs font-semibold text-white hover:bg-emerald-700">
+                              Save Payout Rules
+                            </button>
+                            <span className="text-xs text-zinc-400 dark:text-zinc-500 self-center">Affects all earnings calculations for this tournament.</span>
+                          </div>
+                        </form>
+                      </details>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

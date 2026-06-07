@@ -5,7 +5,7 @@ import TournamentView, { type TvPlayer, type TvMatch } from "@/components/Tourna
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
-import { totalEarningsCents, type MatchResult } from "@/lib/earnings";
+import { totalEarningsCents, resolvePayoutRules, type MatchResult } from "@/lib/earnings";
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
 
@@ -16,7 +16,7 @@ export default async function StandingsPage() {
   const tournament = await prisma.tournament.findFirst({
     where: { status: { in: ["draft", "active", "complete"] } },
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true },
+    select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true, payoutRules: true },
   });
 
   if (!tournament) {
@@ -69,6 +69,8 @@ export default async function StandingsPage() {
     teamsByPlayer.set(p.userId, s);
   }
 
+  const payoutRules = resolvePayoutRules(tournament.payoutRules as Record<string, number> | null);
+
   const matchResults: MatchResult[] = playedMatches.map((m) => ({
     stage: m.stage as MatchResult["stage"],
     tournamentType: tournament.type as MatchResult["tournamentType"],
@@ -78,7 +80,7 @@ export default async function StandingsPage() {
   }));
 
   const ranked = playerIds
-    .map((uid, i) => ({ uid, colorIdx: i, earnings: totalEarningsCents(matchResults, teamsByPlayer.get(uid) ?? new Set()) + adjustments.filter((a) => a.userId === uid).reduce((s, a) => s + a.amountCents, 0) }))
+    .map((uid, i) => ({ uid, colorIdx: i, earnings: totalEarningsCents(matchResults, teamsByPlayer.get(uid) ?? new Set(), payoutRules) + adjustments.filter((a) => a.userId === uid).reduce((s, a) => s + a.amountCents, 0) }))
     .sort((a, b) => b.earnings - a.earnings);
 
   function ownerInfo(teamCode: string) {
@@ -133,11 +135,13 @@ export default async function StandingsPage() {
     <TournamentView
       name={tournament.name}
       year={tournament.year}
+      type={tournament.type}
       status={tournament.status}
       showTodayMatches={false}
       todayMatches={[]}
       players={tvPlayers}
       matchesByStage={tvMatchesByStage}
+      payoutRules={payoutRules}
     />
   );
 }

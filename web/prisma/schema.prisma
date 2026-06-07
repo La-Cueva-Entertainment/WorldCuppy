@@ -33,6 +33,7 @@ model Tournament {
   year           Int
   teamsPerPlayer Int       @default(4)
   pickSeconds    Int?                // null = unlimited (no timer)
+  payoutRules    Json?               // null = use DEFAULT_PAYOUT_RULES from earnings.ts
   status         String    @default("upcoming") // "upcoming" | "draft" | "active" | "complete"
   draftDate      DateTime?
   inviteToken    String?   @unique

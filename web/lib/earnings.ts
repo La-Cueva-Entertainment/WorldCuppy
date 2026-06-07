@@ -27,6 +27,55 @@ export type Stage =
   | "3rd"
   | "final";
 
+/** All configurable payout amounts, stored in cents. */
+export type PayoutRules = {
+  groupWinBase: number;         // win payout base
+  groupWinGdPer: number;        // per goal difference on a win
+  groupDraw: number;            // draw payout
+  r32WinBase: number;
+  r32WinGdPer: number;
+  r16WinBase: number;
+  r16WinGdPer: number;
+  qfWinBase: number;
+  qfWinGdPer: number;
+  sfWinBase: number;
+  sfWinGdPerWC: number;         // world_cup GD bonus per goal
+  sfWinGdPerEuros: number;      // euros GD bonus per goal
+  thirdWinBase: number;
+  thirdWinGdPer: number;
+  finalWinnerBase: number;
+  finalWinnerGoalPer: number;
+  finalRunnerUpBase: number;
+  finalRunnerUpGoalPer: number;
+};
+
+export const DEFAULT_PAYOUT_RULES: PayoutRules = {
+  groupWinBase: 300,
+  groupWinGdPer: 25,
+  groupDraw: 100,
+  r32WinBase: 500,
+  r32WinGdPer: 50,
+  r16WinBase: 500,
+  r16WinGdPer: 50,
+  qfWinBase: 1000,
+  qfWinGdPer: 100,
+  sfWinBase: 1500,
+  sfWinGdPerWC: 200,
+  sfWinGdPerEuros: 100,
+  thirdWinBase: 1000,
+  thirdWinGdPer: 300,
+  finalWinnerBase: 2000,
+  finalWinnerGoalPer: 300,
+  finalRunnerUpBase: 1000,
+  finalRunnerUpGoalPer: 300,
+};
+
+/** Merge a partial (e.g. from DB JSON) with defaults — safe for unknown keys. */
+export function resolvePayoutRules(partial?: Partial<PayoutRules> | null): PayoutRules {
+  if (!partial) return DEFAULT_PAYOUT_RULES;
+  return { ...DEFAULT_PAYOUT_RULES, ...partial };
+}
+
 export type MatchResult = {
   stage: Stage;
   tournamentType: TournamentType;
@@ -54,6 +103,7 @@ export function matchEarningsCents(
   result: MatchResult,
   ownsHome: boolean,
   ownsAway: boolean,
+  rules: PayoutRules = DEFAULT_PAYOUT_RULES,
 ): number {
   if (!ownsHome && !ownsAway) return 0;
 
@@ -70,31 +120,37 @@ export function matchEarningsCents(
 
     switch (stage) {
       case "group": {
-        if (thisTeamWon) total += 300 + gd * 25;
-        else if (draw) total += 100;
+        if (thisTeamWon) total += rules.groupWinBase + gd * rules.groupWinGdPer;
+        else if (draw) total += rules.groupDraw;
         break;
       }
-      case "r32":
+      case "r32": {
+        const winner = penaltyWinner
+          ? penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam)
+          : thisTeamWon;
+        if (winner) total += rules.r32WinBase + gd * rules.r32WinGdPer;
+        break;
+      }
       case "r16": {
         const winner = penaltyWinner
           ? penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam)
           : thisTeamWon;
-        if (winner) total += 500 + gd * 50;
+        if (winner) total += rules.r16WinBase + gd * rules.r16WinGdPer;
         break;
       }
       case "qf": {
         const winner = penaltyWinner
           ? penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam)
           : thisTeamWon;
-        if (winner) total += 1000 + gd * 100;
+        if (winner) total += rules.qfWinBase + gd * rules.qfWinGdPer;
         break;
       }
       case "sf": {
         const winner = penaltyWinner
           ? penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam)
           : thisTeamWon;
-        const gdBonus = tournamentType === "world_cup" ? 200 : 100;
-        if (winner) total += 1500 + gd * gdBonus;
+        const gdBonus = tournamentType === "world_cup" ? rules.sfWinGdPerWC : rules.sfWinGdPerEuros;
+        if (winner) total += rules.sfWinBase + gd * gdBonus;
         break;
       }
       case "3rd": {
@@ -102,16 +158,14 @@ export function matchEarningsCents(
         const winner = penaltyWinner
           ? penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam)
           : thisTeamWon;
-        if (winner) total += 1000 + gd * 300;
+        if (winner) total += rules.thirdWinBase + gd * rules.thirdWinGdPer;
         break;
       }
       case "final": {
         if (thisTeamWon || (penaltyWinner && penaltyWinner === (ownsHome ? result.homeTeam : result.awayTeam))) {
-          // Winner
-          total += 2000 + thisTeamGoals * 300;
+          total += rules.finalWinnerBase + thisTeamGoals * rules.finalWinnerGoalPer;
         } else {
-          // Runner-up
-          total += 1000 + thisTeamGoals * 300;
+          total += rules.finalRunnerUpBase + thisTeamGoals * rules.finalRunnerUpGoalPer;
         }
         break;
       }
@@ -160,12 +214,13 @@ export function oddsJumpBonusCents(
 export function totalEarningsCents(
   matches: MatchResult[],
   ownerTeamCodes: Set<string>,
+  rules: PayoutRules = DEFAULT_PAYOUT_RULES,
 ): number {
   let total = 0;
   for (const m of matches) {
     const oh = ownerTeamCodes.has(m.homeTeam);
     const oa = ownerTeamCodes.has(m.awayTeam);
-    total += matchEarningsCents(m, oh, oa);
+    total += matchEarningsCents(m, oh, oa, rules);
   }
   return total;
 }

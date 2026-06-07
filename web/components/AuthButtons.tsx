@@ -23,7 +23,7 @@ export function AuthButtons({
 
         <Link
           href="/profile"
-          className="inline-flex h-9 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
+          className="inline-flex h-9 items-center whitespace-nowrap rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
         >
           My Profile
         </Link>

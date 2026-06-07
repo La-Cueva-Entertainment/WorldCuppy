@@ -1,7 +1,8 @@
 import { CountryFlag } from "@/components/CountryFlag";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { LiveSync } from "@/components/LiveSync";
-import { formatDollars } from "@/lib/earnings";
+import PayoutRulesCard from "@/components/PayoutRulesCard";
+import { formatDollars, type PayoutRules, DEFAULT_PAYOUT_RULES } from "@/lib/earnings";
 
 export type TvPlayer = {
   id: string;
@@ -42,6 +43,7 @@ export type TvMatch = {
 export interface TournamentViewProps {
   name: string;
   year: number;
+  type?: string;
   status?: string | null;
   isDemo?: boolean;
   showLiveSync?: boolean;
@@ -50,6 +52,7 @@ export interface TournamentViewProps {
   players: TvPlayer[];
   todayMatches: TvMatch[];
   matchesByStage: Partial<Record<string, TvMatch[]>>;
+  payoutRules?: PayoutRules | null;
 }
 
 const PLAYER_COLORS = [
@@ -85,10 +88,12 @@ function fmtTime(iso: string | null | undefined, includeDate = false): string | 
 }
 
 export default function TournamentView({
-  name, year, status, isDemo, showLiveSync, showTodayMatches = true, draftDateISO,
-  players, todayMatches, matchesByStage,
+  name, year, type, status, isDemo, showLiveSync, showTodayMatches = true, draftDateISO,
+  players, todayMatches, matchesByStage, payoutRules,
 }: TournamentViewProps) {
   const hasAnyMatches = STAGE_ORDER.some((s) => (matchesByStage[s]?.length ?? 0) > 0);
+  const rules = payoutRules ?? DEFAULT_PAYOUT_RULES;
+  const isWorldCup = type === "world_cup" || !type;
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
@@ -234,6 +239,8 @@ export default function TournamentView({
             </table>
           </div>
         </section>
+
+        <PayoutRulesCard rules={rules} isWorldCup={isWorldCup} />
 
         {/* Bracket */}
         <section>

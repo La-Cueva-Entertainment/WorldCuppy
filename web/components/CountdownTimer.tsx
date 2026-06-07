@@ -25,7 +25,7 @@ export function CountdownTimer({ targetISO, label }: CountdownTimerProps) {
   const target = targetISO ? new Date(targetISO).getTime() : WC_KICKOFF;
   const displayLabel = label ?? "FIFA World Cup 2026 Kickoff";
 
-  const [timeLeft, setTimeLeft] = useState(() => calcTimeLeft(target));
+  const [timeLeft, setTimeLeft] = useState<ReturnType<typeof calcTimeLeft>>(null);
 
   useEffect(() => {
     setTimeLeft(calcTimeLeft(target));
