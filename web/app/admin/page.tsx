@@ -42,7 +42,7 @@ export default async function AdminPage({
   const resolved = searchParams ? await Promise.resolve(searchParams) : {};
 
   const [tournaments, users, allParticipants, allDrafts, pickCountsRaw] = await Promise.all([
-    prisma.tournament.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true, year: true, type: true, status: true, draftDate: true, inviteToken: true, teamsPerPlayer: true } }),
+    prisma.tournament.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true, year: true, type: true, status: true, draftDate: true, inviteToken: true, teamsPerPlayer: true, pickSeconds: true } }),
     prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, email: true, isAdmin: true } }),
     prisma.tournamentParticipant.findMany({ select: { tournamentId: true, userId: true } }),
     prisma.tournamentDraft.findMany({ select: { tournamentId: true, status: true, currentPick: true, orderUserIds: true } }),
@@ -193,8 +193,33 @@ export default async function AdminPage({
     redirect("/admin?msg=Draft+order+re-randomized");
   }
 
-  async function toggleAdminAction(formData: FormData) {
+  async function resetToUpcomingAction(formData: FormData) {
     "use server";
+    await requireAdmin();
+    const id = String(formData.get("id") ?? "").trim();
+    if (!id) redirect("/admin");
+    // Safety: refuse if any picks have been made
+    const picks = await prisma.lineupPick.count({ where: { tournamentId: id } });
+    if (picks > 0) redirect("/admin?error=Cannot+reset+a+tournament+that+has+picks");
+    await prisma.$transaction([
+      prisma.tournamentDraft.deleteMany({ where: { tournamentId: id } }),
+      prisma.tournament.update({ where: { id }, data: { status: "upcoming" } }),
+    ]);
+    redirect("/admin?msg=Tournament+reset+to+upcoming");
+  }
+
+  async function setPickSecondsAction(formData: FormData) {    "use server";
+    await requireAdmin();
+    const id = String(formData.get("id") ?? "").trim();
+    const raw = String(formData.get("pickSeconds") ?? "").trim();
+    if (!id) redirect("/admin");
+    // Empty string or "unlimited" → null (unlimited); otherwise parse as int
+    const pickSeconds = raw === "" || raw === "unlimited" ? null : Math.max(1, parseInt(raw, 10));
+    await prisma.tournament.update({ where: { id }, data: { pickSeconds } });
+    redirect("/admin?msg=Pick+timer+saved");
+  }
+
+  async function toggleAdminAction(formData: FormData) {    "use server";
     await requireAdmin();
     const uid = String(formData.get("userId") ?? "").trim();
     if (!uid) redirect("/admin");
@@ -292,6 +317,23 @@ export default async function AdminPage({
                         : ""}
                       className="h-8 rounded-lg border border-zinc-300 dark:border-white/10 bg-white dark:bg-zinc-800 px-2 text-xs text-zinc-900 dark:text-white outline-none"
                     />
+                    <button type="submit" className={`h-8 ${ghostBtn}`}>Save</button>
+                  </form>
+                  <form action={setPickSecondsAction} className="flex items-center gap-2">
+                    <input type="hidden" name="id" value={t.id} />
+                    <label className="text-xs text-zinc-500 dark:text-zinc-500">Pick timer</label>
+                    <select
+                      name="pickSeconds"
+                      defaultValue={t.pickSeconds != null ? String(t.pickSeconds) : "unlimited"}
+                      className={`h-8 ${select}`}
+                    >
+                      <option value="unlimited">Unlimited</option>
+                      <option value="30">30s</option>
+                      <option value="60">60s</option>
+                      <option value="90">90s</option>
+                      <option value="120">2m</option>
+                      <option value="300">5m</option>
+                    </select>
                     <button type="submit" className={`h-8 ${ghostBtn}`}>Save</button>
                   </form>
                   {t.status === "upcoming" && pickCount === 0 ? (
@@ -442,6 +484,18 @@ export default async function AdminPage({
                       <button type="submit" className="h-7 rounded-lg bg-sky-600 px-3 text-xs font-semibold text-white hover:bg-sky-700">
                         Complete Tournament
                       </button>
+                    </form>
+                  )}
+
+                  {(t.status === "active" || t.status === "complete") && pickCount === 0 && (
+                    <form action={resetToUpcomingAction}>
+                      <input type="hidden" name="id" value={t.id} />
+                      <ConfirmSubmitButton
+                        confirmText="Reset this tournament back to upcoming? The draft record will be cleared but all enrolled players will remain."
+                        className="h-7 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 ring-1 ring-amber-200 dark:ring-amber-500/20"
+                      >
+                        ↩ Reset to Upcoming
+                      </ConfirmSubmitButton>
                     </form>
                   )}
 

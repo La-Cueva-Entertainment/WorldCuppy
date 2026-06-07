@@ -12,7 +12,7 @@ import { buildDraftTiers } from "@/lib/draftTiers";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
 
-const PICK_SECONDS = Number.parseInt(process.env.DRAFT_PICK_SECONDS ?? "60", 10) || 60;
+const PICK_SECONDS_DEFAULT = Number.parseInt(process.env.DRAFT_PICK_SECONDS ?? "60", 10) || 60;
 
 const MANAGER_COLORS = [
   "rose", "amber", "lime", "emerald", "cyan", "sky", "indigo", "fuchsia",
@@ -43,7 +43,7 @@ export default async function DraftPage({
   const tournament = await prisma.tournament.findFirst({
     where: { status: { in: ["draft", "upcoming"] } },
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true, draftDate: true },
+    select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true, draftDate: true, pickSeconds: true },
   });
 
   if (!tournament) {
@@ -71,6 +71,11 @@ export default async function DraftPage({
   }
 
   const LINEUP_SIZE = tournament.teamsPerPlayer;
+  // null = unlimited (no countdown); fall back to env var default if not configured on tournament
+  const PICK_SECONDS: number | null =
+    tournament.pickSeconds === undefined
+      ? PICK_SECONDS_DEFAULT
+      : tournament.pickSeconds ?? null;
 
   const [draft, allPicks, allUsers] = await Promise.all([
     prisma.tournamentDraft.findUnique({

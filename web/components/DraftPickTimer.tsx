@@ -10,11 +10,13 @@ function formatSeconds(s: number) {
   return `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
 }
 
-export function DraftPickTimer({ seconds, key: _key }: { seconds: number; key?: number }) {
+/** Pass `seconds={null}` for unlimited (no countdown / no auto-refresh). */
+export function DraftPickTimer({ seconds, key: _key }: { seconds: number | null; key?: number }) {
   const router = useRouter();
-  const [remaining, setRemaining] = useState(seconds);
+  const [remaining, setRemaining] = useState(seconds ?? 0);
 
   useEffect(() => {
+    if (seconds === null) return;
     setRemaining(seconds);
     const t = window.setInterval(() => {
       setRemaining((prev) => {
@@ -28,6 +30,17 @@ export function DraftPickTimer({ seconds, key: _key }: { seconds: number; key?: 
     }, 1000);
     return () => window.clearInterval(t);
   }, [seconds, router]);
+
+  if (seconds === null) {
+    return (
+      <div className="flex flex-col items-center">
+        <div className="text-2xl font-mono font-bold tabular-nums text-zinc-400 dark:text-zinc-500">
+          ∞
+        </div>
+        <div className="text-xs text-zinc-500">unlimited</div>
+      </div>
+    );
+  }
 
   const isLow = remaining <= 10;
 

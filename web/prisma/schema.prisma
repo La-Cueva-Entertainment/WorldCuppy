@@ -32,6 +32,7 @@ model Tournament {
   type           String    // "world_cup" | "euros"
   year           Int
   teamsPerPlayer Int       @default(4)
+  pickSeconds    Int?                // null = unlimited (no timer)
   status         String    @default("upcoming") // "upcoming" | "draft" | "active" | "complete"
   draftDate      DateTime?
   inviteToken    String?   @unique
