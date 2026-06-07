@@ -190,6 +190,7 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 860px) {
   .nav-links { display: none; }
   .nav-burger { display: grid; }
+  .nav-signout { display: none; }
 }
 
 /* ── Buttons ────────────────────────────────────────────── */

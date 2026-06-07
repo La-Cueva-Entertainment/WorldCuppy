@@ -6,6 +6,7 @@ import "./globals.css";
 
 import { MobileNav } from "@/components/MobileNav";
 import { NavLink } from "@/components/NavLink";
+import { SignOutButton } from "@/components/SignOutButton";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { authOptions } from "@/lib/auth";
@@ -178,6 +179,7 @@ export default async function RootLayout({
                   >
                     {(session.user.name ?? session.user.email ?? "?")[0].toUpperCase()}
                   </Link>
+                  <SignOutButton />
                   <MobileNav isAdmin={isAdmin || siteOwner} picksCount={picksCount} />
                 </>
               ) : (
