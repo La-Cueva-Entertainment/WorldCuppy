@@ -6,6 +6,7 @@ import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
 import { CopyButton } from "@/components/CopyButton";
 import DraftOrderPicker from "@/components/DraftOrderPicker";
 import { authOptions } from "@/lib/auth";
+import { postDraftStarted } from "@/lib/discord";
 import { activateDraft, resetDraftOrder } from "@/lib/draft";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
@@ -161,14 +162,34 @@ export default async function AdminPage({
     if (rawOrder) {
       try { manualOrder = JSON.parse(rawOrder) as string[]; } catch { /* ignore */ }
     }
+    let draftOrder: string[] = [];
     try {
-      await activateDraft(tournamentId, manualOrder);
+      draftOrder = await activateDraft(tournamentId, manualOrder);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg === "NO_PARTICIPANTS") redirect("/admin?error=No+participants+enrolled+yet");
       if (msg === "INVALID_ORDER") redirect("/admin?error=Invalid+draft+order+submitted");
       redirect("/admin?error=Could+not+start+draft");
     }
+    // Discord notification — fire-and-forget
+    try {
+      const hdrs2 = await headers();
+      const host = hdrs2.get("host") ?? "localhost:3000";
+      const proto = hdrs2.get("x-forwarded-proto") ?? "http";
+      const siteBase = process.env.NEXTAUTH_URL?.replace(/\/$/, "") ?? `${proto}://${host}`;
+      const [t, orderedUsers] = await Promise.all([
+        prisma.tournament.findUnique({ where: { id: tournamentId }, select: { name: true, year: true } }),
+        prisma.user.findMany({ where: { id: { in: draftOrder } }, select: { id: true, name: true, email: true } }),
+      ]);
+      if (t && draftOrder.length > 0) {
+        const uMap = new Map(orderedUsers.map((u) => [u.id, u]));
+        await postDraftStarted({
+          tournamentName: `${t.name} ${t.year}`,
+          order: draftOrder.map((id) => { const u = uMap.get(id); return { name: u?.name ?? u?.email ?? "?" }; }),
+          draftUrl: `${siteBase}/draft`,
+        });
+      }
+    } catch { /* ignore Discord failures */ }
     redirect("/admin?msg=Draft+started");
   }
 

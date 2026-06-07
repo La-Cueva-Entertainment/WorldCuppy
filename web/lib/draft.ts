@@ -24,13 +24,13 @@ function shuffle<T>(arr: T[]): T[] {
  *  If `manualOrder` is provided it is used as-is; otherwise participants are
  *  shuffled randomly.  Safe to call concurrently — the second caller will
  *  silently no-op if another request beat it. */
-export async function activateDraft(tournamentId: string, manualOrder?: string[]): Promise<void> {
+export async function activateDraft(tournamentId: string, manualOrder?: string[]): Promise<string[]> {
   // No-op if already activated
   const existing = await prisma.tournamentDraft.findUnique({
     where: { tournamentId },
-    select: { tournamentId: true },
+    select: { tournamentId: true, orderUserIds: true },
   });
-  if (existing) return;
+  if (existing) return existing.orderUserIds as string[];
 
   const participants = await prisma.tournamentParticipant.findMany({
     where: { tournamentId },
@@ -64,9 +64,10 @@ export async function activateDraft(tournamentId: string, manualOrder?: string[]
     ]);
   } catch (err: unknown) {
     // Unique constraint — another concurrent request already activated. Fine.
-    if ((err as { code?: string })?.code === "P2002") return;
+    if ((err as { code?: string })?.code === "P2002") return orderUserIds;
     throw err;
   }
+  return orderUserIds;
 }
 
 /** Re-randomizes (or manually sets) the draft order. Only allowed before any picks are made. */

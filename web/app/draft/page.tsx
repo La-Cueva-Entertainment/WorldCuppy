@@ -7,6 +7,7 @@ import { CountryFlag } from "@/components/CountryFlag";
 import { DraftPickTimer } from "@/components/DraftPickTimer";
 import TieredTeamsBox from "@/components/TieredTeamsBox";
 import { authOptions } from "@/lib/auth";
+import { postPickMade } from "@/lib/discord";
 import { activateDraft, getSnakeTurnUserId } from "@/lib/draft";
 import { buildDraftTiers } from "@/lib/draftTiers";
 import { prisma } from "@/lib/prisma";
@@ -152,6 +153,10 @@ export default async function DraftPage({
     if (!tournamentId || !teamCode) redirectDraft();
     if (!TEAMS_BY_CODE.has(teamCode)) redirectDraft("Unknown team");
 
+    let _orderIds: string[] = [];
+    let _pickAt = -1;
+    let _maxPicks = 0;
+
     try {
       await prisma.$transaction(async (tx) => {
         const draft = await tx.tournamentDraft.findUnique({
@@ -168,6 +173,9 @@ export default async function DraftPage({
         });
         const lineupSize = lineup?.teamsPerPlayer ?? 4;
         const maxPicks = Math.min(orderIds.length * lineupSize, TEAMS.length);
+        _orderIds = orderIds;
+        _pickAt = draft.currentPick;
+        _maxPicks = maxPicks;
 
         if (draft.currentPick >= maxPicks) throw new Error("DONE");
 
@@ -205,6 +213,36 @@ export default async function DraftPage({
       if (msg === "DONE") redirectDraft("Draft is complete");
       redirectDraft("Could not draft team");
     }
+
+    // Discord notification — never block or fail the draft flow
+    try {
+      const team = TEAMS_BY_CODE.get(teamCode);
+      const picker = userById.get(uid!);
+      if (team && picker && _pickAt >= 0) {
+        const nextPick = _pickAt + 1;
+        const isDraftComplete = nextPick >= _maxPicks;
+        const nextPickerId = !isDraftComplete ? getSnakeTurnUserId(_orderIds, nextPick) : null;
+        const nextPickerUser = nextPickerId ? userById.get(nextPickerId) : null;
+        const siteBase =
+          process.env.NEXTAUTH_URL?.replace(/\/$/, "") ??
+          (() => {
+            const host = hdrs.get("host") ?? "localhost:3000";
+            const proto = hdrs.get("x-forwarded-proto") ?? "http";
+            return `${proto}://${host}`;
+          })();
+        await postPickMade({
+          pickerName: picker.name ?? picker.email ?? "?",
+          teamName: team.name,
+          teamCode,
+          pickNumber: _pickAt + 1,
+          totalPicks: _maxPicks,
+          nextPickerName: nextPickerUser ? (nextPickerUser.name ?? nextPickerUser.email ?? "?") : null,
+          tournamentName: `${tournament.name} ${tournament.year}`,
+          draftUrl: `${siteBase}/draft`,
+          isDraftComplete,
+        });
+      }
+    } catch { /* ignore Discord failures */ }
 
     redirectDraft();
   }
