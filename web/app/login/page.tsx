@@ -35,7 +35,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", minHeight: "calc(100vh - 60px)" }}>
+    <div className="login-layout">
 
       {/* ── Left promo (pitch panel) — hides on mobile ── */}
       <div className="pitch-panel hide-sm" style={{ padding: "clamp(32px,5vw,60px) clamp(24px,4vw,48px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>

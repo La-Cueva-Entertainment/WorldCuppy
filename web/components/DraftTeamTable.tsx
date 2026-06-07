@@ -74,7 +74,7 @@ export default function DraftTeamTable({
   return (
     <div>
       {/* Controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
+      <div className="draft-controls">
         <div className="seg">
           <button className={tierFilter === "all" ? "on" : ""} onClick={() => setTierFilter("all")} type="button">All</button>
           {tiers.map((t) => (
@@ -83,8 +83,7 @@ export default function DraftTeamTable({
             </button>
           ))}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, height: 38, padding: "0 12px",
-          border: "1px solid var(--line)", borderRadius: 10, background: "var(--surface)", color: "var(--ink-faint)" }}>
+        <div className="draft-search">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>
           </svg>
@@ -94,7 +93,7 @@ export default function DraftTeamTable({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ border: "none", background: "transparent", outline: "none",
-              fontFamily: "inherit", fontSize: 14, color: "var(--ink)", width: 120 }}
+              fontFamily: "inherit", fontSize: 14, color: "var(--ink)", flex: 1, minWidth: 0 }}
           />
         </div>
       </div>
@@ -106,8 +105,8 @@ export default function DraftTeamTable({
       )}
 
       {/* Team table */}
-      <div className="card tbl-scroll" style={{ padding: "4px 6px" }}>
-        <table className="tbl teamtbl" style={{ width: "100%", minWidth: 460 }}>
+      <div className="card tbl-scroll">
+        <table className="tbl teamtbl">
           <thead>
             <tr>
               <th style={{ width: 46 }}>Flag</th>

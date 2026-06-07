@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo, Hanken_Grotesk, Spline_Sans_Mono } from "next/font/google";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
@@ -30,6 +30,11 @@ const splineMono = Spline_Sans_Mono({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? "https://worldcuppy.lacueva.us"),
