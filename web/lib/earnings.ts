@@ -1,9 +1,18 @@
+import { TEAMS } from "@/lib/teams";
+
+// Build a tier lookup once at module load (tier 1 = best ranked, tier 4 = worst).
+const _sortedByRank = TEAMS.slice().sort((a, b) => a.rank - b.rank);
+const _tierChunk = Math.ceil(_sortedByRank.length / 4);
+const TEAM_TIER = new Map<string, number>(
+  _sortedByRank.map((t, i) => [t.code, Math.floor(i / _tierChunk) + 1])
+);
+
 /**
  * Earnings engine — implements the friend-pool scoring rules:
  *
  * Group stage (per match):
  *   Win +$3.00 | Tie +$1.00 | GD ×$0.25
- *   Odds-jump bonuses: 2 spots jumped +$1, 3+ spots jumped +$2
+ *   Tier upset bonus (group stage only): winner 1 tier worse +$1, 2 tiers +$2, 3+ tiers +$3
  *
  * Round of 32 (WC only): Win +$5 | GD ×$0.50
  * Round of 16: Win +$5 | GD ×$0.50  (Euros: same)
@@ -47,6 +56,9 @@ export type PayoutRules = {
   finalWinnerGoalPer: number;
   finalRunnerUpBase: number;
   finalRunnerUpGoalPer: number;
+  upsetBonus1Tier: number;  // group stage: winning team is 1 tier below the loser
+  upsetBonus2Tier: number;  // group stage: winning team is 2 tiers below the loser
+  upsetBonus3Tier: number;  // group stage: winning team is 3+ tiers below the loser
 };
 
 export const DEFAULT_PAYOUT_RULES: PayoutRules = {
@@ -68,6 +80,9 @@ export const DEFAULT_PAYOUT_RULES: PayoutRules = {
   finalWinnerGoalPer: 300,
   finalRunnerUpBase: 1000,
   finalRunnerUpGoalPer: 300,
+  upsetBonus1Tier: 100,
+  upsetBonus2Tier: 200,
+  upsetBonus3Tier: 300,
 };
 
 /** Merge a partial (e.g. from DB JSON) with defaults — safe for unknown keys. */
@@ -115,13 +130,21 @@ export function matchEarningsCents(
 
   let total = 0;
 
-  function earnFor(ownsThisTeam: boolean, thisTeamWon: boolean, thisTeamGoals: number) {
+  function earnFor(ownsThisTeam: boolean, thisTeamWon: boolean, thisTeamGoals: number, thisTeamCode: string, opponentCode: string) {
     if (!ownsThisTeam) return;
 
     switch (stage) {
       case "group": {
-        if (thisTeamWon) total += rules.groupWinBase + gd * rules.groupWinGdPer;
-        else if (draw) total += rules.groupDraw;
+        if (thisTeamWon) {
+          total += rules.groupWinBase + gd * rules.groupWinGdPer;
+          // Tier upset bonus: positive gap means winner is in a worse (higher-numbered) tier
+          const winnerTier = TEAM_TIER.get(thisTeamCode) ?? 4;
+          const loserTier = TEAM_TIER.get(opponentCode) ?? 1;
+          const tierGap = winnerTier - loserTier;
+          if (tierGap >= 3) total += rules.upsetBonus3Tier;
+          else if (tierGap === 2) total += rules.upsetBonus2Tier;
+          else if (tierGap === 1) total += rules.upsetBonus1Tier;
+        } else if (draw) total += rules.groupDraw;
         break;
       }
       case "r32": {
@@ -172,8 +195,8 @@ export function matchEarningsCents(
     }
   }
 
-  earnFor(ownsHome, homeWon, homeScore);
-  earnFor(ownsAway, awayWon, awayScore);
+  earnFor(ownsHome, homeWon, homeScore, result.homeTeam, result.awayTeam);
+  earnFor(ownsAway, awayWon, awayScore, result.awayTeam, result.homeTeam);
 
   return total;
 }

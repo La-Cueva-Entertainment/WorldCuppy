@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import Link from "next/link";
 
+import PayoutRulesCard from "@/components/PayoutRulesCard";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolvePayoutRules, type PayoutRules } from "@/lib/earnings";
 import { InstallButton } from "@/components/InstallButton";
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
@@ -30,7 +32,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
   const tournament = await prisma.tournament.findFirst({
     where: { inviteToken: token },
-    select: { id: true, name: true, year: true, type: true, status: true, draftDate: true },
+    select: { id: true, name: true, year: true, type: true, status: true, draftDate: true, payoutRules: true },
   });
 
   if (!tournament) {
@@ -109,6 +111,14 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         >
           Create an account
         </Link>
+      </div>
+
+      <div className="mt-8 w-full text-left">
+        <PayoutRulesCard
+          rules={resolvePayoutRules(tournament.payoutRules as Partial<PayoutRules> | null)}
+          isWorldCup={tournament.type === "world_cup"}
+          defaultOpen
+        />
       </div>
 
       <div className="mt-6 flex flex-col items-center gap-2">

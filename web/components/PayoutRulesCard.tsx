@@ -10,15 +10,19 @@ function fmt(cents: number) {
 interface Props {
   rules: PayoutRules;
   isWorldCup: boolean;
+  defaultOpen?: boolean;
 }
 
-export default function PayoutRulesCard({ rules, isWorldCup }: Props) {
-  const [open, setOpen] = useState(false);
+export default function PayoutRulesCard({ rules, isWorldCup, defaultOpen = false }: Props) {
+  const [open, setOpen] = useState(defaultOpen);
 
   const rows: { label: string; value: string; sub?: string }[] = [
     // Group Stage
     { label: "Group: Win", value: fmt(rules.groupWinBase), sub: `+ ${fmt(rules.groupWinGdPer)} per goal diff` },
     { label: "Group: Draw", value: fmt(rules.groupDraw) },
+    { label: "Group: Upset bonus (1 tier gap)", value: fmt(rules.upsetBonus1Tier), sub: "winning team is 1 tier below loser" },
+    { label: "Group: Upset bonus (2 tier gap)", value: fmt(rules.upsetBonus2Tier), sub: "winning team is 2 tiers below loser" },
+    { label: "Group: Upset bonus (3+ tier gap)", value: fmt(rules.upsetBonus3Tier), sub: "winning team is 3+ tiers below loser" },
     // Knockout rounds
     ...(isWorldCup ? [{ label: "Round of 32: Win", value: fmt(rules.r32WinBase), sub: `+ ${fmt(rules.r32WinGdPer)} per goal diff` }] : []),
     { label: "Round of 16: Win", value: fmt(rules.r16WinBase), sub: `+ ${fmt(rules.r16WinGdPer)} per goal diff` },
@@ -54,7 +58,7 @@ export default function PayoutRulesCard({ rules, isWorldCup }: Props) {
       {open && (
         <div className="border-t border-zinc-100 dark:border-white/10 px-4 pb-4 pt-3">
           <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
-            You earn money for every match your drafted teams play. Higher-stakes rounds pay more.
+            You earn money for every match your drafted teams play. Higher-stakes rounds pay more. Upsets in the group stage earn a bonus based on tier gap.
           </p>
           <div className="space-y-1">
             {rows.map((row) => (
@@ -75,7 +79,7 @@ export default function PayoutRulesCard({ rules, isWorldCup }: Props) {
             ))}
           </div>
           <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
-            Losses earn nothing. Draws only pay out in the group stage.
+            Losses earn nothing. Draws only pay out in the group stage. Upset bonuses only apply to group stage wins.
           </p>
         </div>
       )}

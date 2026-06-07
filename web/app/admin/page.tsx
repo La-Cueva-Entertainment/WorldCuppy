@@ -598,24 +598,27 @@ export default async function AdminPage({
                   const isWC = t.type === "world_cup";
                   type RuleField = { key: keyof PayoutRules; label: string; show?: boolean };
                   const fields: RuleField[] = [
-                    { key: "groupWinBase",          label: "Group Win ($)" },
-                    { key: "groupWinGdPer",         label: "Group Win GD/goal ($)" },
-                    { key: "groupDraw",             label: "Group Draw ($)" },
-                    { key: "r32WinBase",            label: "R32 Win ($)", show: isWC },
-                    { key: "r32WinGdPer",           label: "R32 GD/goal ($)", show: isWC },
-                    { key: "r16WinBase",            label: "R16 Win ($)" },
-                    { key: "r16WinGdPer",           label: "R16 GD/goal ($)" },
-                    { key: "qfWinBase",             label: "QF Win ($)" },
-                    { key: "qfWinGdPer",            label: "QF GD/goal ($)" },
-                    { key: "sfWinBase",             label: "SF Win ($)" },
-                    { key: "sfWinGdPerWC",          label: "SF GD/goal WC ($)", show: isWC },
-                    { key: "sfWinGdPerEuros",       label: "SF GD/goal Euros ($)", show: !isWC },
-                    { key: "thirdWinBase",          label: "3rd Win ($)", show: isWC },
-                    { key: "thirdWinGdPer",         label: "3rd GD/goal ($)", show: isWC },
-                    { key: "finalWinnerBase",       label: "Final Winner ($)" },
-                    { key: "finalWinnerGoalPer",    label: "Final Winner goal ($)" },
-                    { key: "finalRunnerUpBase",     label: "Final Runner-up ($)" },
-                    { key: "finalRunnerUpGoalPer",  label: "Final Runner-up goal ($)" },
+                    { key: "groupWinBase",          label: "Group Stage: Win base ($)" },
+                    { key: "groupWinGdPer",         label: "Group Stage: Bonus per goal diff ($)" },
+                    { key: "groupDraw",             label: "Group Stage: Draw ($)" },
+                    { key: "r32WinBase",            label: "Round of 32: Win base ($)", show: isWC },
+                    { key: "r32WinGdPer",           label: "Round of 32: Bonus per goal diff ($)", show: isWC },
+                    { key: "r16WinBase",            label: "Round of 16: Win base ($)" },
+                    { key: "r16WinGdPer",           label: "Round of 16: Bonus per goal diff ($)" },
+                    { key: "qfWinBase",             label: "Quarter Final: Win base ($)" },
+                    { key: "qfWinGdPer",            label: "Quarter Final: Bonus per goal diff ($)" },
+                    { key: "sfWinBase",             label: "Semi Final: Win base ($)" },
+                    { key: "sfWinGdPerWC",          label: "Semi Final: Bonus per goal diff — World Cup ($)", show: isWC },
+                    { key: "sfWinGdPerEuros",       label: "Semi Final: Bonus per goal diff — Euros ($)", show: !isWC },
+                    { key: "thirdWinBase",          label: "3rd Place: Win base ($)", show: isWC },
+                    { key: "thirdWinGdPer",         label: "3rd Place: Bonus per goal diff ($)", show: isWC },
+                    { key: "finalWinnerBase",       label: "Final: Winner base ($)" },
+                    { key: "finalWinnerGoalPer",    label: "Final: Winner bonus per goal scored ($)" },
+                    { key: "finalRunnerUpBase",     label: "Final: Runner-up base ($)" },
+                    { key: "finalRunnerUpGoalPer",  label: "Final: Runner-up bonus per goal scored ($)" },
+                    { key: "upsetBonus1Tier",       label: "Group Stage: Upset bonus — winner 1 tier worse ($)" },
+                    { key: "upsetBonus2Tier",       label: "Group Stage: Upset bonus — winner 2 tiers worse ($)" },
+                    { key: "upsetBonus3Tier",       label: "Group Stage: Upset bonus — winner 3+ tiers worse ($)" },
                   ];
                   return (
                     <div className="border-t border-zinc-100 dark:border-white/5 pt-2">
@@ -624,18 +627,18 @@ export default async function AdminPage({
                           <span className="group-open:hidden">▶</span><span className="hidden group-open:inline">▼</span>
                           💰 Payout Rules
                         </summary>
-                        <form action={setPayoutRulesAction} className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        <form action={setPayoutRulesAction} className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                           <input type="hidden" name="id" value={t.id} />
                           {fields.filter((f) => f.show !== false).map((f) => (
-                            <div key={f.key} className="flex items-center gap-2">
-                              <label className="w-40 shrink-0 text-xs text-zinc-500 dark:text-zinc-400">{f.label}</label>
+                            <div key={f.key} className="flex flex-col gap-1">
+                              <label className="text-xs text-zinc-500 dark:text-zinc-400">{f.label}</label>
                               <input
                                 name={f.key}
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 defaultValue={(pr[f.key] / 100).toFixed(2)}
-                                className={`${input} w-24`}
+                                className={`${input} w-full`}
                               />
                             </div>
                           ))}
