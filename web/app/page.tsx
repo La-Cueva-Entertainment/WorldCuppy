@@ -209,7 +209,7 @@ export default async function HomePage() {
         </div>
 
         {/* 2-col layout */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 332px", gap: "22px", alignItems: "start" }}>
+        <div className="home-grid">
           {/* Left column */}
           <div style={{ display: "grid", gap: "26px", minWidth: 0 }}>
 
@@ -387,7 +387,7 @@ export default async function HomePage() {
           </div>
 
           {/* Right: news sidebar */}
-          <aside style={{ position: "sticky", top: "80px", display: "grid", gap: "18px" }}>
+          <aside className="home-sidebar">
             <RssFeed />
           </aside>
         </div>

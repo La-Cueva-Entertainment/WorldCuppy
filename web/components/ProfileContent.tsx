@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 
 import { CountryFlag } from "@/components/CountryFlag";
 import { CountdownTimer } from "@/components/CountdownTimer";
@@ -59,6 +59,27 @@ function fmtPST(d: Date | null): string | null {
   });
 }
 
+function DarkModeToggle() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
+  function toggle() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    try { localStorage.setItem("wc_theme", next ? "dark" : "light"); } catch { /* noop */ }
+  }
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label="Toggle dark mode"
+      className={`sw-track${dark ? "" : " off"}`}
+    />
+  );
+}
+
 export default function ProfileContent({
   upcomingTournament,
   activeTournamentName,
@@ -91,233 +112,235 @@ export default function ProfileContent({
     });
   }
 
+  const initials = (name || initialUserName || "?")[0]?.toUpperCase() ?? "?";
+  const totalTournaments = history.length + (activeTournamentName ? 1 : 0) + (upcomingTournament && !activeTournamentName ? 1 : 0);
+  const totalTeams = history.reduce((s, h) => s + h.teamCodes.length, 0) + teams.length;
+  const activeTournLabel = activeTournamentName ?? (upcomingTournament ? `${upcomingTournament.name} ${upcomingTournament.year}` : "Manager");
+
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
-      <h1 className="mb-6 text-2xl font-extrabold text-zinc-900 dark:text-white">My Profile</h1>
+    <main className="page">
+      <div className="wrap">
 
-      {/* Settings */}
-      <div className="mb-6 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 space-y-3">
-          <label className="grid gap-1">
-            <span className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Your name</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={64}
-              className="h-10 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500"
-            />
-          </label>
-          {upcomingTournamentId && (
-            <label className="grid gap-1">
-              <span className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Team name</span>
-              <input
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                maxLength={64}
-                placeholder="e.g. The Underdogs FC"
-                className="h-10 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 placeholder:text-zinc-400"
-              />
-            </label>
-          )}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isPending}
-            className="h-9 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-          >
-            {isPending ? "Saving…" : "Save"}
-          </button>
+        {/* â”€â”€ Profile header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        <div className="prof-head">
+          <div className="prof-av">{initials}</div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div className="kicker grass">{activeTournLabel}</div>
+            <h1 style={{ marginTop: 4, fontSize: "clamp(28px,4vw,36px)" }}>{name || initialUserName || "Your Profile"}</h1>
+          </div>
         </div>
 
+        {/* â”€â”€ Two-column layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        <div className="prof-grid">
 
-      {saved && (
-        <div className="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
-          Profile updated ✓
-        </div>
-      )}
+          {/* Left column */}
+          <div style={{ display: "grid", gap: 22 }}>
 
-      {/* Upcoming / Draft tournament card */}
-      {upcomingTournament && (
-        <section className="mb-6 rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-500/10 dark:to-green-500/5 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">
-                {upcomingTournament.status === "draft" ? "Draft Open" : "Invited"}
+            {/* Stats */}
+            <div className="stats4">
+              <div className="card st">
+                <div className="k">Tournaments</div>
+                <div className="v">{totalTournaments || <>&mdash;</>}</div>
               </div>
-              <div className="text-lg font-bold text-zinc-900 dark:text-white">
-                {upcomingTournament.name} {upcomingTournament.year}
+              <div className="card st">
+                <div className="k">Earned</div>
+                <div className="v money pos">{formatDollars(totalEarnedCents)}</div>
               </div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                {upcomingTournament.teamsPerPlayer} teams per player · snake draft
+              <div className="card st">
+                <div className="k">Teams now</div>
+                <div className="v">{teams.length || <>&mdash;</>}</div>
+              </div>
+              <div className="card st">
+                <div className="k">All-time picks</div>
+                <div className="v">{totalTeams || <>&mdash;</>}</div>
               </div>
             </div>
-            <Link
-              href={draftHref}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
-            >
-              Open Draft →
-            </Link>
-          </div>
-          {upcomingTournament.draftDate && (
-            <div className="mt-4">
-              <CountdownTimer
-                targetISO={upcomingTournament.draftDate.toISOString()}
-                label={`${upcomingTournament.name} ${upcomingTournament.year} Draft`}
-              />
-            </div>
-          )}
-        </section>
-      )}
 
-      {/* Active tournament section */}
-      {activeTournamentName && (
-        <>
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <div className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">{activeTournamentName}</div>
-            <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2 text-right">
-              <div className="text-xs text-zinc-500 dark:text-zinc-400">Total earned</div>
-              <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{formatDollars(totalEarnedCents)}</div>
-            </div>
-          </div>
-
-          {teams.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-8 text-center">
-              <p className="text-zinc-500 dark:text-zinc-400">You haven&apos;t drafted any teams yet.</p>
-              <Link href={draftHref} className="mt-3 inline-block text-sm text-emerald-600 dark:text-emerald-400 hover:underline">Go to draft →</Link>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {teams.map((team) => {
-                const teamData = TEAMS_BY_CODE.get(team.teamCode);
-                const players = getTeamPlayers(team.teamCode);
-
-                return (
-                  <div key={team.teamCode} className="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden">
-                    <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-100 dark:border-white/5">
-                      <CountryFlag code={team.teamCode} label={teamData?.name ?? team.teamCode} className="h-9 w-12 rounded-sm" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-zinc-900 dark:text-white text-lg leading-tight">{teamData?.name ?? team.teamCode}</div>
-                        <div className="text-xs text-zinc-400 dark:text-zinc-500">FIFA #{teamData?.rank} · Group {teamData?.group}</div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-xs text-zinc-400 dark:text-zinc-500">earned</div>
-                        <div className={`text-xl font-bold ${team.earnedCents > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400 dark:text-zinc-500"}`}>
-                          {formatDollars(team.earnedCents)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {players.length > 0 && (
-                      <div className="px-5 py-3 flex flex-wrap gap-2 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                        {players.map((p) => (
-                          <span key={p.name} className="flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300">
-                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${POSITION_COLOR[p.position]}`}>{p.position}</span>
-                            {p.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {team.matchBreakdown.length > 0 ? (
-                      <div className="divide-y divide-zinc-100 dark:divide-white/5">
-                        {team.matchBreakdown.map((match, i) => {
-                          const opp = TEAMS_BY_CODE.get(match.oppCode);
-                          return (
-                            <div key={i} className="px-5 py-3">
-                              <div className="flex items-center gap-3">
-                                <span className="w-16 shrink-0 text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wide">{STAGE_LABELS[match.stage] ?? match.stage}</span>
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  <CountryFlag code={match.oppCode} label={opp?.name ?? match.oppCode} className="h-4 w-6 rounded-sm shrink-0" />
-                                  <span className="text-sm text-zinc-600 dark:text-zinc-400 truncate">vs {opp?.name ?? match.oppCode}</span>
-                                </div>
-                                <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-bold ${match.isWin ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : match.isDraw ? "bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-zinc-400" : "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400"}`}>
-                                  {match.myScore}–{match.oppScore}
-                                </span>
-                                <span className={`shrink-0 text-sm font-semibold w-14 text-right ${match.earnedCents > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-300 dark:text-zinc-600"}`}>
-                                  {match.earnedCents > 0 ? `+${formatDollars(match.earnedCents)}` : "—"}
-                                </span>
-                              </div>
-                              {(match.venue || match.matchDate) && (
-                                <div className="mt-0.5 pl-[76px] flex flex-wrap gap-2 text-[10px] text-zinc-400 dark:text-zinc-500">
-                                  {match.matchDate && <span>{fmtPST(match.matchDate)}</span>}
-                                  {match.venue && <span>· {match.venue}</span>}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="px-5 py-3 text-sm text-zinc-400 dark:text-zinc-500">No matches played yet</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="mt-10 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6">
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">How you earn</h2>
-            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-              {[
-                { stage: "Group Win", earn: "$3 + $0.25/gd" },
-                { stage: "Group Tie", earn: "$1.00" },
-                { stage: "R16 Win", earn: "$5 + $0.50/gd" },
-                { stage: "Quarter Final", earn: "$10 + $1/gd" },
-                { stage: "Semi Final", earn: "$15 + $2/gd" },
-                { stage: "3rd Place", earn: "$10 + $3/gd" },
-                { stage: "Runner-up", earn: "$10 + $3/goal" },
-                { stage: "Champion", earn: "$20 + $3/goal" },
-                { stage: "Odds 2-jump", earn: "+$1 bonus" },
-                { stage: "Odds 3-jump", earn: "+$2 bonus" },
-              ].map(({ stage, earn }) => (
-                <div key={stage} className="flex justify-between rounded-xl border border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 px-3 py-2">
-                  <span className="text-zinc-600 dark:text-zinc-400">{stage}</span>
-                  <span className="font-semibold text-emerald-700 dark:text-emerald-400">{earn}</span>
+            {/* Upcoming tournament */}
+            {upcomingTournament && (
+              <section className="card card-pad">
+                <div className="kicker" style={{ marginBottom: 6 }}>
+                  {upcomingTournament.status === "draft" ? "Draft open" : "Invited"}
                 </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Tournament history */}
-      {history.length > 0 && (
-        <div className="mt-8">
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">Tournament History</h2>
-          <div className="flex flex-col gap-3">
-            {history.map((t) => {
-              const historyInner = (
-                <>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                   <div>
-                    <div className="font-bold text-zinc-900 dark:text-white">{t.name} {t.year}</div>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {t.teamCodes.slice(0, 6).map((code) => {
-                        const td = TEAMS_BY_CODE.get(code);
-                        return (
-                          <span key={code} className="flex items-center gap-1 rounded-md border border-zinc-100 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-2 py-1 text-xs text-zinc-600 dark:text-zinc-300">
-                            <CountryFlag code={code} label={td?.name ?? code} className="h-3 w-4 rounded-sm shrink-0" />
-                            {td?.name ?? code}
-                          </span>
-                        );
-                      })}
-                      {t.teamCodes.length > 6 && (
-                        <span className="text-xs text-zinc-400 dark:text-zinc-500">+{t.teamCodes.length - 6} more</span>
-                      )}
-                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 17 }}>{upcomingTournament.name} {upcomingTournament.year}</div>
+                    <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{upcomingTournament.teamsPerPlayer} teams per player &middot; snake draft</div>
                   </div>
-                  {!disableTournamentLinks && <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">View →</span>}
-                </>
-              );
-              const rowClass = "flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-4";
-              return disableTournamentLinks ? (
-                <div key={t.id} className={rowClass}>{historyInner}</div>
-              ) : (
-                <Link key={t.id} href={`/profile/tournament/${t.id}`} className={`${rowClass} transition-colors hover:bg-zinc-50 dark:hover:bg-white/10`}>{historyInner}</Link>
-              );
-            })}
+                  <Link href={draftHref} className="btn btn-primary btn-sm" style={{ height: 36, fontSize: 13 }}>
+                    Open Draft &rarr;
+                  </Link>
+                </div>
+                {upcomingTournament.draftDate && (
+                  <div style={{ marginTop: 14 }}>
+                    <CountdownTimer
+                      targetISO={upcomingTournament.draftDate.toISOString()}
+                      label={`${upcomingTournament.name} ${upcomingTournament.year} Draft`}
+                    />
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Active tournament teams */}
+            {activeTournamentName && teams.length > 0 && (
+              <section>
+                <div className="sec-head" style={{ marginBottom: 14 }}>
+                  <h2 style={{ fontSize: 19 }}>{activeTournamentName}</h2>
+                  <div className="money pos" style={{ fontSize: 15 }}>{formatDollars(totalEarnedCents)}</div>
+                </div>
+                <div style={{ display: "grid", gap: 14 }}>
+                  {teams.map((team) => {
+                    const teamData = TEAMS_BY_CODE.get(team.teamCode);
+                    const players = getTeamPlayers(team.teamCode);
+                    return (
+                      <div key={team.teamCode} className="card" style={{ overflow: "hidden" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderBottom: "1px solid var(--line-soft)" }}>
+                          <CountryFlag code={team.teamCode} label={teamData?.name ?? team.teamCode} className="flag-lg fi-rect" />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: 16 }}>{teamData?.name ?? team.teamCode}</div>
+                            <div className="tag-soft">FIFA #{teamData?.rank} &middot; Group {teamData?.group}</div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div className="tag-soft">earned</div>
+                            <div className={`money${team.earnedCents > 0 ? " pos" : ""}`} style={{ fontSize: 18 }}>
+                              {formatDollars(team.earnedCents)}
+                            </div>
+                          </div>
+                        </div>
+                        {players.length > 0 && (
+                          <div style={{ padding: "10px 16px", display: "flex", flexWrap: "wrap", gap: 8, borderBottom: "1px solid var(--line-soft)", background: "var(--surface-2)" }}>
+                            {players.map((p) => (
+                              <span key={p.name} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ink-soft)" }}>
+                                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${POSITION_COLOR[p.position]}`}>{p.position}</span>
+                                {p.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {team.matchBreakdown.length > 0 ? (
+                          <div>
+                            {team.matchBreakdown.map((match, i) => {
+                              const opp = TEAMS_BY_CODE.get(match.oppCode);
+                              return (
+                                <div key={i} style={{ padding: "10px 16px", borderBottom: "1px solid var(--line-soft)", display: "flex", alignItems: "center", gap: 10 }}>
+                                  <span style={{ width: 48, fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--ink-faint)" }}>
+                                    {STAGE_LABELS[match.stage] ?? match.stage}
+                                  </span>
+                                  <CountryFlag code={match.oppCode} label={opp?.name ?? match.oppCode} className="flag-sm fi-rect" />
+                                  <span style={{ flex: 1, fontSize: 13, color: "var(--ink-soft)" }}>vs {opp?.name ?? match.oppCode}</span>
+                                  <span className={`finish${match.isWin ? " pod" : match.isDraw ? " mid" : " mid"}`}>
+                                    {match.myScore}â€“{match.oppScore}
+                                  </span>
+                                  <span className={`money${match.earnedCents > 0 ? " pos" : ""}`} style={{ fontSize: 13, minWidth: 52, textAlign: "right" }}>
+                                    {match.earnedCents > 0 ? `+${formatDollars(match.earnedCents)}` : "â€”"}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div style={{ padding: "10px 16px", fontSize: 13, color: "var(--ink-faint)" }}>No matches played yet</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* Tournament history */}
+            {history.length > 0 && (
+              <section className="card" style={{ padding: "8px 16px" }}>
+                <div className="sec-head" style={{ margin: "12px 0 8px" }}>
+                  <h2 style={{ fontSize: 19 }}>Tournament history</h2>
+                </div>
+                {history.map((t) => {
+                  const inner = (
+                    <>
+                      <span className="yr">{t.year}</span>
+                      <div className="nm">{t.name}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span className="finish mid">{t.teamCodes.length} picks</span>
+                      </div>
+                    </>
+                  );
+                  return disableTournamentLinks ? (
+                    <div key={t.id} className="hist-row">{inner}</div>
+                  ) : (
+                    <Link key={t.id} href={`/profile/tournament/${t.id}`} className="hist-row" style={{ textDecoration: "none", color: "inherit" }}>
+                      {inner}
+                    </Link>
+                  );
+                })}
+              </section>
+            )}
           </div>
+
+          {/* Right column â€” settings sidebar */}
+          <aside style={{ display: "grid", gap: 18 }}>
+            <section className="card card-pad">
+              <h2 style={{ fontSize: 18, marginBottom: 6 }}>Settings</h2>
+
+              {saved && (
+                <div className="badge grass" style={{ marginBottom: 10, height: "auto", padding: "6px 12px", borderRadius: 10 }}>
+                  Saved âœ“
+                </div>
+              )}
+
+              <div className="setrow">
+                <div>
+                  <div className="lbl">Dark mode</div>
+                  <div className="sub">Match your system</div>
+                </div>
+                <DarkModeToggle />
+              </div>
+
+              <div className="setrow" style={{ paddingTop: 16, flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span className="lbl">Display name</span>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    maxLength={64}
+                    style={{
+                      height: 38, borderRadius: 10, border: "1px solid var(--line)",
+                      background: "var(--surface-2)", color: "var(--ink)", padding: "0 12px",
+                      fontSize: 14, outline: "none",
+                    }}
+                  />
+                </label>
+                {upcomingTournamentId && (
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span className="lbl">Team name</span>
+                    <input
+                      value={teamName}
+                      onChange={(e) => setTeamName(e.target.value)}
+                      maxLength={64}
+                      placeholder="e.g. The Underdogs FC"
+                      style={{
+                        height: 38, borderRadius: 10, border: "1px solid var(--line)",
+                        background: "var(--surface-2)", color: "var(--ink)", padding: "0 12px",
+                        fontSize: 14, outline: "none",
+                      }}
+                    />
+                  </label>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isPending}
+                  className="btn btn-primary"
+                  style={{ height: 38, fontSize: 13, alignSelf: "flex-start" }}
+                >
+                  {isPending ? "Savingâ€¦" : "Save changes"}
+                </button>
+              </div>
+            </section>
+          </aside>
+
         </div>
-      )}
+      </div>
     </main>
   );
 }

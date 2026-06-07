@@ -5,6 +5,7 @@ export type RssItem = {
   pubDate: string;
   pubDateMs: number;
   imageUrl?: string;
+  largeImageUrl?: string;
 };
 
 const RSS_URL =
@@ -34,13 +35,45 @@ function cleanText(raw: string): string {
   return s.replace(/\s+/g, " ").trim();
 }
 
-function extractImage(body: string): string | undefined {
-  return (
-    body.match(/<media:thumbnail[^>]*\surl="([^"]+)"/)?.[1] ??
-    body.match(/<media:content[^>]*\surl="([^"]+)"/)?.[1] ??
-    body.match(/<enclosure[^>]*\surl="([^"]+)"[^>]*type="image\//)?.[1] ??
-    undefined
-  );
+/** Extract all media URLs with their declared widths, then return { small, large }. */
+function extractImages(body: string): { imageUrl?: string; largeImageUrl?: string } {
+  // Collect every media:content and media:thumbnail with optional width attr
+  const candidates: { url: string; width: number }[] = [];
+  const contentRe = /<media:(?:content|thumbnail)[^>]*\surl="([^"]+)"([^>]*)/g;
+  let m: RegExpExecArray | null;
+  while ((m = contentRe.exec(body)) !== null) {
+    const url = m[1];
+    const widthMatch = m[2].match(/\bwidth="(\d+)"/);
+    const width = widthMatch ? parseInt(widthMatch[1], 10) : 0;
+    candidates.push({ url, width });
+  }
+  // Also pick up enclosure images
+  const enclosureMatch = body.match(/<enclosure[^>]*\surl="([^"]+)"[^>]*type="image\//);
+  if (enclosureMatch) candidates.push({ url: enclosureMatch[1], width: 0 });
+
+  if (candidates.length === 0) return {};
+
+  candidates.sort((a, b) => a.width - b.width);
+  const small = candidates[0].url;
+  const large = candidates[candidates.length - 1].url;
+
+  // If no explicit width metadata, try rewriting the URL to request a larger size
+  const largeImageUrl = candidates[candidates.length - 1].width > 0 ? large : upsizeUrl(large);
+
+  return { imageUrl: small, largeImageUrl };
+}
+
+/** Rewrite CDN URL to request a larger image where possible. */
+function upsizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.searchParams.has("width")) { u.searchParams.set("width", "1200"); return u.toString(); }
+    if (u.searchParams.has("w")) { u.searchParams.set("w", "1200"); return u.toString(); }
+  } catch { /* non-absolute */ }
+  // Path-based size tokens like _400.jpg → _1200.jpg or -400w. → -1200w.
+  return url
+    .replace(/([_-])\d{3,4}(w?)(\.(jpg|jpeg|png|webp))/i, "$11200$2$3")
+    .replace(/([?&](?:width|w)=)\d+/, "$11200");
 }
 
 export async function fetchRss(maxAgeDays = 7): Promise<RssItem[]> {
@@ -70,12 +103,12 @@ export async function fetchRss(maxAgeDays = 7): Promise<RssItem[]> {
       const description = cleanText(descRaw).slice(0, 220);
       const pubDate = cleanText(pubDateRaw);
       const pubDateMs = pubDate ? new Date(pubDate).getTime() : 0;
-      const imageUrl = extractImage(body);
+      const { imageUrl, largeImageUrl } = extractImages(body);
 
       if (!title || !link) continue;
       if (pubDateMs && pubDateMs < cutoff) continue;
 
-      items.push({ title, link, description, pubDate, pubDateMs, imageUrl });
+      items.push({ title, link, description, pubDate, pubDateMs, imageUrl, largeImageUrl });
     }
 
     return items.sort((a, b) => b.pubDateMs - a.pubDateMs);

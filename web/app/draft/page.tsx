@@ -3,9 +3,8 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
 import { CountdownTimer } from "@/components/CountdownTimer";
-import { CountryFlag } from "@/components/CountryFlag";
 import { DraftPickTimer } from "@/components/DraftPickTimer";
-import TieredTeamsBox from "@/components/TieredTeamsBox";
+import DraftTeamTable from "@/components/DraftTeamTable";
 import { authOptions } from "@/lib/auth";
 import { postPickMade } from "@/lib/discord";
 import { activateDraft, getSnakeTurnUserId } from "@/lib/draft";
@@ -14,10 +13,6 @@ import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
 
 const PICK_SECONDS_DEFAULT = Number.parseInt(process.env.DRAFT_PICK_SECONDS ?? "60", 10) || 60;
-
-const MANAGER_COLORS = [
-  "rose", "amber", "lime", "emerald", "cyan", "sky", "indigo", "fuchsia",
-] as const;
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
 
@@ -264,182 +259,184 @@ export default async function DraftPage({
 
   const draftComplete = draft?.status === "complete" || (maxPicks > 0 && currentPick >= maxPicks);
 
+  const recentPicks = allPicks.map((p) => {
+    const u = userById.get(p.userId);
+    const team = TEAMS_BY_CODE.get(p.teamCode);
+    const colorIdx = orderUserIds.indexOf(p.userId);
+    return {
+      pickNumber: (p.pickNumber ?? 0) + 1,
+      teamCode: p.teamCode,
+      teamName: team?.name ?? p.teamCode.toUpperCase(),
+      pickerName: u?.name ?? u?.email?.split("@")[0] ?? "?",
+      colorIdx: colorIdx >= 0 ? colorIdx : 0,
+    };
+  });
+
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
-      {/* Header */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <main className="page">
+      <div className="wrap">
+
+      {/* ── Page header ─────────────────────────────── */}
+      <div className="between" style={{ flexWrap: "wrap", gap: "10px", marginBottom: "6px" }}>
         <div>
-          <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white">
-            Draft — <span className="text-green-600 dark:text-green-400">{tournament.name} {tournament.year}</span>
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {LINEUP_SIZE} teams per player · snake draft
+          <div className={`kicker ${draftActive ? "grass" : ""}`}>
+            {draftActive ? "Snake draft · Live" : draftComplete ? "Snake draft · Complete" : "Snake draft · Scheduled"}
+          </div>
+          <h1>Draft Console</h1>
+          <p className="muted">
+            {tournament.name} {tournament.year} · {LINEUP_SIZE} teams per player ·{" "}
+            {currentPick} of {maxPicks} picked
           </p>
         </div>
-
-        {!draftActive && !draftComplete && tournament.draftDate && (
-          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-5 py-3">
-            <div className="text-xs text-zinc-500 dark:text-zinc-400">Draft scheduled</div>
-            <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-              {tournament.draftDate.toLocaleString("en-US", {
-                timeZone: "America/Los_Angeles",
-                weekday: "long", month: "long", day: "numeric",
-                hour: "numeric", minute: "2-digit", hour12: true, timeZoneName: "short",
-              })}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Error */}
       {resolved.error && (
-        <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-300">
+        <div className="card" style={{ padding: "12px 16px", marginBottom: 14, borderColor: "var(--hot)", color: "var(--hot)" }}>
           {resolved.error}
         </div>
       )}
 
       {draftActive ? (
         <>
-          {/* Draft status bar */}
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-4">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-500 mb-0.5">Now Picking</div>
-              <div className="text-lg font-bold text-zinc-900 dark:text-white">
-                {canPickNow ? "Your turn! 🎉" : currentPickerName}
+          {/* ── Clockbar ──────────────────────────────── */}
+          <div className="clockbar pitch-panel">
+            <div className="who">
+              <div className="lbl">● On the clock</div>
+              <div className="nm">
+                {canPickNow ? `Your pick, ${userById.get(userId)?.name ?? "you"}` : currentPickerName}
               </div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Round {roundNumber} · Pick {pickInRound} of {orderUserIds.length}
+              <div className="sub">
+                Round {roundNumber} · Pick {pickInRound} of {orderUserIds.length} · pick a team below
               </div>
             </div>
-            {canPickNow && (
-              <DraftPickTimer seconds={PICK_SECONDS} key={currentPick} />
-            )}
+            <DraftPickTimer seconds={PICK_SECONDS} key={currentPick} />
           </div>
 
-          {/* Draft order — reversed on backward rounds so the active picker is always at the left */}
-          <div className="mb-6 flex flex-wrap gap-2">
-            {(() => {
-              const round = Math.floor(currentPick / orderUserIds.length);
-              const forward = round % 2 === 0;
-              const displayIds = forward ? orderUserIds : [...orderUserIds].reverse();
-              return displayIds.map((uid) => {
-                const originalIdx = orderUserIds.indexOf(uid);
-                const isCurrent = uid === expectedTurnUserId;
-                const colorKey = MANAGER_COLORS[originalIdx % MANAGER_COLORS.length];
-                const u = userById.get(uid);
-                const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
-                return (
-                  <div
-                    key={uid}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
-                      isCurrent
-                        ? `bg-${colorKey}-500/25 ring-${colorKey}-500/60 text-${colorKey}-700 dark:text-${colorKey}-200 animate-pulse`
-                        : `bg-${colorKey}-500/10 ring-${colorKey}-500/20 text-${colorKey}-700 dark:text-${colorKey}-300`
-                    }`}
-                  >
-                    {name} ({allPicks.filter((p) => p.userId === uid).length}/{LINEUP_SIZE})
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        </>
-      ) : (
-        <div className="mb-6 rounded-2xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-5 py-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            {draftComplete
-              ? "Draft is complete! Check the standings."
-              : orderUserIds.length === 0
-                ? "No participants enrolled yet. An admin needs to set up the draft."
-                : "Draft has not started yet. Waiting for the scheduled time."}
-          </p>
+          {/* ── Draft grid: 260px rail | board ────────── */}
+          <div className="draft-grid">
 
-          {/* Countdown to draft start */}
-          {!draftComplete && tournament.draftDate && (
-            <div className="mt-4">
-              <CountdownTimer
-                targetISO={tournament.draftDate.toISOString()}
-                label={`${tournament.name} ${tournament.year} Draft`}
-              />
-            </div>
-          )}
-
-          {/* Show draft order if known (upcoming but draft record exists) */}
-          {!draftComplete && orderUserIds.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
+            {/* Left: manager rail */}
+            <aside className="card rail">
+              <div className="rail-h">Draft order</div>
               {orderUserIds.map((uid, idx) => {
                 const u = userById.get(uid);
                 const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
-                const colorKey = MANAGER_COLORS[idx % MANAGER_COLORS.length];
+                const isMe = uid === userId;
+                const isOn = uid === expectedTurnUserId;
+                const picksMade = allPicks.filter((p) => p.userId === uid).length;
                 return (
-                  <div
-                    key={uid}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 bg-${colorKey}-500/10 ring-${colorKey}-500/20 text-${colorKey}-700 dark:text-${colorKey}-300`}
-                  >
-                    {idx + 1}. {name}
+                  <div key={uid} className={`railrow m${idx % 8}${isOn ? " on" : ""}`}>
+                    <span className="ord">{idx + 1}</span>
+                    <span className={`mdot m${idx % 8}`} />
+                    <span className="nm">
+                      {name}
+                      {isMe && <span className="you">you</span>}
+                    </span>
+                    {isOn ? (
+                      <span className="clk">picking…</span>
+                    ) : (
+                      <span className="roster">
+                        {Array.from({ length: LINEUP_SIZE }).map((_, si) => (
+                          <span key={si} className={`sq${si < picksMade ? " f" : ""}`} />
+                        ))}
+                      </span>
+                    )}
                   </div>
                 );
               })}
+            </aside>
+
+            {/* Right: team picker board */}
+            <div>
+              <DraftTeamTable
+                tiers={tiers}
+                takenTeamCodes={takenTeamCodes}
+                myTeamCodes={myTeamCodes}
+                takenBy={takenBy}
+                canDraft={true}
+                canPickNow={canPickNow}
+                picksCount={myPicks.length}
+                lineupSize={LINEUP_SIZE}
+                draftTeamAction={draftTeamAction}
+                extraFormFields={<input type="hidden" name="tournamentId" value={tournament.id} />}
+                initialTierKey={resolved.tier}
+                recentPicks={recentPicks}
+              />
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Status / countdown card */}
+          <div className="card" style={{ padding: "20px 24px", marginBottom: 18 }}>
+            <p style={{ color: "var(--ink-soft)" }}>
+              {draftComplete
+                ? "Draft is complete! Check the standings."
+                : orderUserIds.length === 0
+                  ? "No participants enrolled yet. An admin needs to set up the draft."
+                  : "Draft has not started yet. Waiting for the scheduled time."}
+            </p>
+            {!draftComplete && tournament.draftDate && (
+              <div style={{ marginTop: 16 }}>
+                <CountdownTimer
+                  targetISO={tournament.draftDate.toISOString()}
+                  label={`${tournament.name} ${tournament.year} Draft`}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Draft grid: rail + team table (same layout as active, just no pick buttons) */}
+          {!draftComplete && (
+            <div className="draft-grid">
+              {orderUserIds.length > 0 && (
+                <aside className="card rail">
+                  <div className="rail-h">Draft order</div>
+                  {orderUserIds.map((uid, idx) => {
+                    const u = userById.get(uid);
+                    const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
+                    const isMe = uid === userId;
+                    return (
+                      <div key={uid} className={`railrow m${idx % 8}`}>
+                        <span className="ord">{idx + 1}</span>
+                        <span className={`mdot m${idx % 8}`} />
+                        <span className="nm">
+                          {name}
+                          {isMe && <span className="you">you</span>}
+                        </span>
+                        <span className="roster">
+                          {Array.from({ length: LINEUP_SIZE }).map((_, si) => (
+                            <span key={si} className="sq" />
+                          ))}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </aside>
+              )}
+              <div>
+                <DraftTeamTable
+                  tiers={tiers}
+                  takenTeamCodes={takenTeamCodes}
+                  myTeamCodes={myTeamCodes}
+                  takenBy={takenBy}
+                  canDraft={false}
+                  canPickNow={false}
+                  picksCount={myPicks.length}
+                  lineupSize={LINEUP_SIZE}
+                  draftTeamAction={draftTeamAction}
+                  initialTierKey={resolved.tier}
+                  recentPicks={recentPicks}
+                />
+              </div>
             </div>
           )}
-        </div>
+        </>
       )}
 
-      {/* Team picker */}
-      <TieredTeamsBox
-        tiers={tiers}
-        initialTierKey={resolved.tier}
-        takenTeamCodes={takenTeamCodes}
-        myTeamCodes={myTeamCodes}
-        takenBy={takenBy}
-        canDraft={draftActive}
-        canPickNow={canPickNow}
-        picksCount={myPicks.length}
-        lineupSize={LINEUP_SIZE}
-        draftTeamAction={draftTeamAction}
-        showDraftControls
-        showRanks={false}
-        extraFormFields={
-          <input type="hidden" name="tournamentId" value={tournament.id} />
-        }
-      />
-
-      {/* Pick history — pick 1 first. Mobile: 2-col row-major. sm+: column-major (8/col). */}
-      {allPicks.length > 0 && (() => {
-        const pickCards = allPicks.map((p) => {
-          const u = userById.get(p.userId);
-          const playerName = u?.name ?? u?.email?.split("@")[0] ?? "?";
-          const team = TEAMS_BY_CODE.get(p.teamCode);
-          const idx = orderUserIds.indexOf(p.userId);
-          const colorKey = MANAGER_COLORS[idx >= 0 ? idx % MANAGER_COLORS.length : 0];
-          return (
-            <div
-              key={`${p.userId}-${p.teamCode}`}
-              className="flex items-center gap-1.5 rounded-lg bg-zinc-50 dark:bg-white/5 px-2 py-1"
-            >
-              <span className="w-5 shrink-0 text-right text-[9px] tabular-nums text-zinc-400 dark:text-zinc-600">#{(p.pickNumber ?? 0) + 1}</span>
-              <CountryFlag code={p.teamCode} label={team?.name ?? p.teamCode} className="h-3 w-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-900 dark:text-white">
-                {team?.name ?? p.teamCode.toUpperCase()}
-              </span>
-              <span className={`shrink-0 text-[9px] font-semibold text-${colorKey}-600 dark:text-${colorKey}-400`}>
-                {playerName}
-              </span>
-            </div>
-          );
-        });
-        return (
-          <section className="mt-8">
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
-              Pick History
-            </h2>
-            {/* Mobile: 2-col row-major */}
-            <div className="grid grid-cols-2 gap-1 sm:hidden">{pickCards}</div>
-            {/* Desktop: 4-col column-major, 8 rows deep */}
-            <div className="hidden sm:grid sm:grid-flow-col gap-1" style={{ gridTemplateRows: "repeat(8, auto)" }}>{pickCards}</div>
-          </section>
-        );
-      })()}
+      </div>
     </main>
   );
 }
+

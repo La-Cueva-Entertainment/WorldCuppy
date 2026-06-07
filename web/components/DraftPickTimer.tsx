@@ -33,25 +33,19 @@ export function DraftPickTimer({ seconds, key: _key }: { seconds: number | null;
 
   if (seconds === null) {
     return (
-      <div className="flex flex-col items-center">
-        <div className="text-2xl font-mono font-bold tabular-nums text-zinc-400 dark:text-zinc-500">
-          ∞
-        </div>
-        <div className="text-xs text-zinc-500">unlimited</div>
+      <div style={{ textAlign: "center" }}>
+        <div className="timer">∞</div>
+        <div className="tcap">unlimited</div>
       </div>
     );
   }
 
-  const isLow = remaining <= 10;
+  const isLow = remaining <= 15;
 
   return (
-    <div className="flex flex-col items-center">
-      <div className={`text-2xl font-mono font-bold tabular-nums ${
-        isLow ? "text-rose-400 animate-pulse" : "text-green-300"
-      }`}>
-        {formatSeconds(remaining)}
-      </div>
-      <div className="text-xs text-zinc-500">to pick</div>
+    <div style={{ textAlign: "center" }}>
+      <div className={`timer${isLow ? " low" : ""}`}>{formatSeconds(remaining)}</div>
+      <div className="tcap">to pick</div>
     </div>
   );
 }
