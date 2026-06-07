@@ -56,7 +56,6 @@ export function MobileNav({
         <DrawerLink href="/" exact onClick={close}>Home</DrawerLink>
         <DrawerLink href="/standings" onClick={close}>Standings</DrawerLink>
         <DrawerLink href="/draft" onClick={close}>Draft</DrawerLink>
-        <DrawerLink href="/lineup" onClick={close}>My Teams</DrawerLink>
         <DrawerLink href="/news" onClick={close}>News</DrawerLink>
         <DrawerLink href="/profile" onClick={close}>Profile</DrawerLink>
 
