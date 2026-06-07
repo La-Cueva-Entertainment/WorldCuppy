@@ -1,17 +1,14 @@
 import Link from "next/link";
-import Image from "next/image";
 import { getServerSession } from "next-auth";
 
 import { CountryFlag } from "@/components/CountryFlag";
 import { CountdownTimer } from "@/components/CountdownTimer";
-import { InstallButton } from "@/components/InstallButton";
-import { InlineInstallGuide } from "@/components/InlineInstallGuide";
 import { LiveSync } from "@/components/LiveSync";
 import RssFeed from "@/components/RssFeed";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
-import { matchEarningsCents, formatDollars, type MatchResult } from "@/lib/earnings";
+import { matchEarningsCents, totalEarningsCents, resolvePayoutRules, formatDollars, type MatchResult } from "@/lib/earnings";
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
 
@@ -20,16 +17,12 @@ const STAGE_LABELS: Record<string, string> = {
   qf: "Quarter Finals", sf: "Semi Finals", "3rd": "3rd Place", final: "Final",
 };
 
-const PLAYER_COLORS = [
-  "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
-  "bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300",
-  "bg-sky-100 dark:bg-sky-500/15 text-sky-800 dark:text-sky-300",
-  "bg-rose-100 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300",
-  "bg-purple-100 dark:bg-purple-500/15 text-purple-800 dark:text-purple-300",
-  "bg-orange-100 dark:bg-orange-500/15 text-orange-800 dark:text-orange-300",
-  "bg-cyan-100 dark:bg-cyan-500/15 text-cyan-800 dark:text-cyan-300",
-  "bg-fuchsia-100 dark:bg-fuchsia-500/15 text-fuchsia-800 dark:text-fuchsia-300",
-];
+/** Ordinal suffix for a rank number */
+function ordinal(n: number) {
+  const s = ["th","st","nd","rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
+}
 
 function fmtTime(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -44,103 +37,63 @@ export default async function HomePage() {
 
   if (!session) {
     return (
-      <div className="flex flex-col">
+      <div className="page">
+        <div className="wrap">
+          {/* ── Hero ── */}
+          <section className="pitch-panel" style={{ borderRadius: "var(--r-xl)", padding: "clamp(32px,5vw,60px) clamp(20px,4vw,48px)", marginBottom: "32px" }}>
+            <div style={{ maxWidth: "560px" }}>
+              <span className="badge" style={{ marginBottom: "18px", background: "rgba(255,255,255,.15)", color: "#fff", border: "1px solid rgba(255,255,255,.2)" }}>
+                <span className="live-dot" style={{ background: "#fff" }}></span>
+                World Cup 2026
+              </span>
+              <h1 style={{ fontSize: "clamp(34px,6vw,58px)", color: "#fff", marginTop: "4px", lineHeight: 1.0 }}>
+                Pick nations.<br />Win the <span style={{ color: "var(--gold)" }}>pool.</span>
+              </h1>
+              <p style={{ marginTop: "16px", fontSize: "16px", color: "rgba(255,255,255,.78)", lineHeight: 1.55, maxWidth: "440px" }}>
+                Draft real national teams, track every match live, and compete with friends for real money.
+              </p>
+              <div style={{ display: "flex", gap: "12px", marginTop: "28px", flexWrap: "wrap" }}>
+                <Link href="/register" className="btn btn-gold">Create your account</Link>
+                <Link href="/login" className="btn btn-ghost" style={{ background: "rgba(255,255,255,.12)", borderColor: "rgba(255,255,255,.2)", color: "#fff" }}>Sign in →</Link>
+              </div>
+              <div style={{ display: "flex", gap: "24px", marginTop: "28px", flexWrap: "wrap" }}>
+                {[["🌍", "All major tournaments"], ["🐍", "Fair snake draft"], ["📊", "Live earnings"]].map(([icon, label]) => (
+                  <div key={label} style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "13px", color: "rgba(255,255,255,.7)", fontWeight: 600 }}>
+                    <span>{icon}</span><span>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
 
-        {/* ── Mobile landing ── */}
-        <div className="flex flex-col md:hidden px-6 pt-4 pb-12 space-y-8">
-
-          {/* Headline */}
-          <div className="flex flex-col items-center text-center">
-            <h2 className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
-              Pick teams.<br />Win money.
-            </h2>
-            <p className="mt-3 text-zinc-500 dark:text-zinc-400 text-base max-w-xs">
-              Draft real national teams,<br />track every match, compete.
-            </p>
-          </div>
-
-          {/* CTAs */}
-          <div className="space-y-3">
-            <Link
-              href="/login"
-              className="flex w-full items-center justify-center rounded-2xl bg-green-600 py-4 text-base font-bold text-white shadow-sm hover:bg-green-700"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="flex w-full items-center justify-center rounded-2xl border border-zinc-200 dark:border-white/15 bg-white dark:bg-white/8 py-4 text-base font-semibold text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-white/12"
-            >
-              Create account
-            </Link>
-          </div>
-
-          {/* Features */}
-          <div className="space-y-2">
+          {/* ── Feature cards ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", marginBottom: "32px" }}>
             {[
-              { icon: "🌍", title: "World Cup · Euros · Nations League", desc: "All major international tournaments" },
-              { icon: "🐍", title: "Fair snake draft", desc: "Everyone gets a fair shot at the top teams" },
-              { icon: "📊", title: "Live standings & earnings", desc: "Watch your money grow match by match" },
+              { icon: "🏆", title: "Every tournament", desc: "World Cup, Euros, Nations League — all covered with live match data." },
+              { icon: "🐍", title: "Fair snake draft", desc: "Pick national teams in a snake draft — everyone gets a fair shot at the best." },
+              { icon: "💰", title: "Live earnings", desc: "Earn money for wins, goal differences, and knockout upsets. Settled in real time." },
             ].map(({ icon, title, desc }) => (
-              <div key={title} className="flex items-center gap-3 rounded-2xl border border-zinc-100 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-4 py-3.5">
-                <span className="text-2xl shrink-0">{icon}</span>
-                <div>
-                  <div className="font-semibold text-zinc-900 dark:text-white text-sm">{title}</div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{desc}</div>
-                </div>
+              <div key={title} className="card card-pad">
+                <div style={{ fontSize: "28px", marginBottom: "10px" }}>{icon}</div>
+                <h3 style={{ fontSize: "16px", marginBottom: "6px" }}>{title}</h3>
+                <p style={{ fontSize: "14px", color: "var(--ink-soft)", margin: 0, lineHeight: 1.5 }}>{desc}</p>
               </div>
             ))}
           </div>
 
-          {/* Install */}
-          <InlineInstallGuide />
-
-        </div>
-
-        {/* ── Desktop landing ── */}
-        <div className="hidden md:flex flex-col">
-          {/* Hero with players */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-green-800 via-green-700 to-emerald-600 min-h-[360px] 2xl:min-h-[420px] flex items-end">
-            <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-900/60 to-transparent" />
-            <div className="relative z-10 flex flex-col justify-center px-[5vw] py-12 max-w-2xl 2xl:max-w-4xl">
-              <h1 className="text-6xl font-extrabold tracking-tight text-white drop-shadow-lg lg:text-7xl">
-                World <span className="text-yellow-400">Cuppy</span>
-              </h1>
-              <p className="mt-3 text-lg text-white/80 drop-shadow lg:text-xl">
-                International Fantasy Fútbol - Draft Nations
-              </p>
-            </div>
-            <div className="absolute bottom-0 right-[2vw] h-[330px] 2xl:h-[390px] select-none pointer-events-none">
-              <Image src="/swedish.png" alt="" width={310} height={330} className="h-full w-auto object-contain object-bottom scale-x-[-1]" priority />
-            </div>
-            <div className="absolute bottom-0 right-[16vw] h-[345px] 2xl:h-[405px] select-none pointer-events-none">
-              <Image src="/brazil6.png" alt="" width={345} height={345} className="h-full w-auto object-contain object-bottom" priority />
-            </div>
-            <div className="absolute bottom-0 right-[28vw] h-[320px] 2xl:h-[380px] select-none pointer-events-none">
-              <Image src="/ivory5.png" alt="" width={320} height={320} className="h-full w-auto object-contain object-bottom" priority />
-            </div>
-            <div className="absolute bottom-0 right-[43vw] h-[300px] 2xl:h-[360px] select-none pointer-events-none">
-              <Image src="/belgian.png" alt="" width={280} height={300} className="h-full w-auto object-contain object-bottom" priority />
-            </div>
-            <div className="absolute bottom-0 right-[52vw] h-[340px] 2xl:h-[400px] select-none pointer-events-none">
-              <Image src="/spain3.png" alt="" width={320} height={340} className="h-full w-auto object-contain object-bottom" priority />
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center px-6 py-12 text-center">
-            <div className="flex flex-wrap justify-center gap-3 text-sm">
-              <div className="rounded-full border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2 text-zinc-600 dark:text-zinc-300 shadow-sm">🗓️ World Cup · Euros · Nations League</div>
-              <div className="rounded-full border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2 text-zinc-600 dark:text-zinc-300 shadow-sm">🐍 Fair snake draft</div>
-              <div className="rounded-full border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2 text-zinc-600 dark:text-zinc-300 shadow-sm">📊 Live standings & earnings</div>
-            </div>
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
-              <Link href="/login" className="inline-flex h-12 items-center rounded-2xl bg-green-600 px-8 text-base font-bold text-white shadow-sm hover:bg-green-700">Sign in</Link>
-              <Link href="/register" className="inline-flex h-12 items-center rounded-2xl border border-zinc-200 dark:border-white/20 bg-white dark:bg-white/10 px-8 text-base font-semibold text-zinc-700 dark:text-white shadow-sm hover:bg-zinc-50 dark:hover:bg-white/20">Create account</Link>
-              <InstallButton />
+          {/* ── How it works ── */}
+          <div className="card card-pad" style={{ textAlign: "center" }}>
+            <div className="kicker" style={{ marginBottom: "12px" }}>How it works</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "20px", marginTop: "16px" }}>
+              {["Create an account", "Join a pool", "Snake draft your teams", "Earn money every match"].map((step, i) => (
+                <div key={step} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--grass-soft)", color: "var(--grass-deep)", fontFamily: "var(--font-archivo), Archivo, sans-serif", fontWeight: 800, fontSize: "16px", display: "grid", placeItems: "center" }}>{i + 1}</div>
+                  <p style={{ fontSize: "14px", fontWeight: 600, margin: 0, color: "var(--ink)" }}>{step}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-
       </div>
     );
   }
@@ -158,7 +111,7 @@ export default async function HomePage() {
   const tournament = await prisma.tournament.findFirst({
     where: { status: { in: ["upcoming", "draft", "active", "complete"] } },
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true, draftDate: true },
+    select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true, draftDate: true, payoutRules: true },
   });
 
   // ── Today's matches ──────────────────────────────────────────────
@@ -166,7 +119,7 @@ export default async function HomePage() {
   const todayStart = new Date(Date.UTC(nowPST.getFullYear(), nowPST.getMonth(), nowPST.getDate(), 8, 0, 0));
   const todayEnd = new Date(Date.UTC(nowPST.getFullYear(), nowPST.getMonth(), nowPST.getDate() + 1, 8, 0, 0));
 
-  const [todayDbMatches, allPicks, users] = tournament
+  const [todayDbMatches, allPicks, users, playedMatches, adjustments] = tournament
     ? await Promise.all([
         prisma.match.findMany({
           where: { tournamentId: tournament.id, matchDate: { gte: todayStart, lte: todayEnd } },
@@ -178,8 +131,16 @@ export default async function HomePage() {
           select: { userId: true, teamCode: true },
         }),
         prisma.user.findMany({ select: { id: true, name: true, email: true } }),
+        prisma.match.findMany({
+          where: { tournamentId: tournament.id, played: true },
+          select: { stage: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true },
+        }),
+        prisma.earningsAdjustment.findMany({
+          where: { tournamentId: tournament.id },
+          select: { userId: true, amountCents: true },
+        }),
       ])
-    : [[], [], []];
+    : [[], [], [], [], []];
 
   const userById = new Map(users.map((u: { id: string; name: string | null; email: string | null }) => [u.id, u]));
   const playerIds = [...new Set(allPicks.map((p: { userId: string; teamCode: string }) => p.userId))].sort();
@@ -190,162 +151,250 @@ export default async function HomePage() {
     teamsByPlayer.set(p.userId, s);
   }
 
+  // ── Compute per-player standings ──────────────────────────────────
+  const payoutRules = tournament ? resolvePayoutRules((tournament.payoutRules as Record<string, number> | null)) : null;
+  const matchResults: MatchResult[] = playedMatches.map((m: { stage: string; homeTeam: string; awayTeam: string; homeScore: number | null; awayScore: number | null; penaltyWinner: string | null }) => ({
+    stage: m.stage as MatchResult["stage"],
+    tournamentType: (tournament?.type ?? "world_cup") as MatchResult["tournamentType"],
+    homeTeam: m.homeTeam, awayTeam: m.awayTeam,
+    homeScore: m.homeScore ?? 0, awayScore: m.awayScore ?? 0,
+    penaltyWinner: m.penaltyWinner ?? null,
+  }));
+
+  const adjByUser = new Map<string, number>();
+  for (const a of adjustments as { userId: string; amountCents: number }[]) {
+    adjByUser.set(a.userId, (adjByUser.get(a.userId) ?? 0) + a.amountCents);
+  }
+
+  const standings = playerIds
+    .map((uid: string) => {
+      const teams = teamsByPlayer.get(uid) ?? new Set<string>();
+      const cents = payoutRules
+        ? totalEarningsCents(matchResults, teams, payoutRules) + (adjByUser.get(uid) ?? 0)
+        : (adjByUser.get(uid) ?? 0);
+      const u = userById.get(uid);
+      const displayName = u?.name ?? u?.email?.split("@")[0] ?? "?";
+      return { uid, displayName, cents };
+    })
+    .sort((a, b) => b.cents - a.cents);
+
+  const myIdx = standings.findIndex((s) => s.uid === userId);
+  const myRank = myIdx + 1;
+  const myEntry = standings[myIdx];
+  const myTeams = userId ? [...(teamsByPlayer.get(userId) ?? new Set<string>())] : [];
+  const leadCents = myIdx === 0 && standings.length > 1 ? (myEntry?.cents ?? 0) - (standings[1]?.cents ?? 0) : null;
+
   const showDraftCard = tournament && (tournament.status === "upcoming" || tournament.status === "draft");
   const showLiveSync = tournament?.status === "active";
+  const isActive = tournament?.status === "active" || tournament?.status === "complete";
+
+  // Manager color index (stable: sorted playerIds index)
+  const colorOf = (uid: string) => playerIds.indexOf(uid) % 8;
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
-      <div className="mb-4 flex justify-end">
-        <InstallButton />
-      </div>
-      <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-        {/* Main column */}
-        <div className="space-y-8 min-w-0">
+    <main className="page">
+      <div className="wrap">
+        {/* Page header */}
+        <div className="between" style={{ marginBottom: "18px", flexWrap: "wrap", gap: "10px" }}>
+          <div>
+            <div className="kicker grass">{tournament?.status === "active" ? "Live" : tournament?.status === "draft" ? "Draft Open" : tournament?.status === "complete" ? "Complete" : "Coming Up"}</div>
+            <h1 style={{ fontSize: "clamp(26px,4vw,34px)", marginTop: "4px" }}>
+              {tournament ? `${tournament.name} ${tournament.year}` : "World Cuppy"}
+            </h1>
+          </div>
+          {todayDbMatches.length > 0 && (
+            <span className="badge hot"><span className="live-dot"></span> {todayDbMatches.length} match{todayDbMatches.length !== 1 ? "es" : ""} today</span>
+          )}
+          {showLiveSync && <LiveSync />}
+        </div>
 
-          {/* Draft Card */}
-          {showDraftCard && (
-            <section className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-500/10 dark:to-green-500/5 p-6">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">
-                    {tournament.status === "draft" ? "Draft Open" : "Coming Up"}
+        {/* 2-col layout */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 332px", gap: "22px", alignItems: "start" }}>
+          {/* Left column */}
+          <div style={{ display: "grid", gap: "26px", minWidth: 0 }}>
+
+            {/* Draft countdown card */}
+            {showDraftCard && tournament.draftDate && (
+              <section className="card card-pad">
+                <div className="between" style={{ marginBottom: "14px" }}>
+                  <div>
+                    <div className="kicker">{tournament.status === "draft" ? "Draft Open" : "Coming Up"}</div>
+                    <h2 style={{ marginTop: "4px" }}>{tournament.name} {tournament.year}</h2>
+                    <p className="muted" style={{ fontSize: "13px", marginTop: "4px" }}>{tournament.teamsPerPlayer} teams per player · snake draft</p>
                   </div>
-                  <h2 className="text-2xl font-extrabold text-zinc-900 dark:text-white">
-                    {tournament.name} <span className="text-emerald-600 dark:text-emerald-400">{tournament.year}</span>
-                  </h2>
-                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                    {tournament.teamsPerPlayer} teams per player · snake draft
-                  </p>
+                  <Link href="/draft" className="btn btn-primary btn-sm">Open Draft →</Link>
                 </div>
-                <Link
-                  href="/draft"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
-                >
-                  Open Draft →
-                </Link>
-              </div>
+                <CountdownTimer targetISO={tournament.draftDate.toISOString()} label={`${tournament.name} ${tournament.year} Draft`} />
+              </section>
+            )}
 
-              {tournament.draftDate && (
-                <div className="mt-5">
-                  <CountdownTimer
-                    targetISO={tournament.draftDate.toISOString()}
-                    label={`${tournament.name} ${tournament.year} Draft`}
-                  />
+            {/* Hero: your position */}
+            {isActive && myEntry && (
+              <section className="pitch-panel" style={{ borderRadius: "var(--r-xl)", padding: "clamp(20px,3vw,30px)", display: "grid", gridTemplateColumns: "1fr auto", gap: "18px", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.7)" }}>Your position</div>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: "14px", marginTop: "6px" }}>
+                    <div style={{ fontFamily: "var(--font-archivo), Archivo, sans-serif", fontWeight: 900, fontSize: "clamp(54px,9vw,84px)", lineHeight: .82, letterSpacing: "-.04em", color: "#fff" }}>
+                      {ordinal(myRank)}
+                    </div>
+                    <div style={{ paddingBottom: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.7)", marginBottom: "2px" }}>Earnings</div>
+                      <div className="money" style={{ fontFamily: "var(--font-spline), 'Spline Sans Mono', monospace", fontWeight: 700, fontSize: "clamp(26px,4vw,38px)", color: "var(--gold)" }}>
+                        {formatDollars(myEntry.cents)}
+                      </div>
+                    </div>
+                  </div>
+                  {myTeams.length > 0 && (
+                    <div style={{ display: "flex", gap: "7px", marginTop: "14px", flexWrap: "wrap" }}>
+                      {myTeams.map((code) => (
+                        <CountryFlag key={code} code={code} label={TEAMS_BY_CODE.get(code)?.name ?? code} className="fi-rect flag-xl" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {standings.length > 1 && (
+                  <div className="hide-sm" style={{ textAlign: "right" }}>
+                    {leadCents !== null && leadCents > 0 ? (
+                      <>
+                        <div style={{ fontSize: "12px", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.7)" }}>Lead over 2nd</div>
+                        <div className="money" style={{ fontFamily: "var(--font-spline), 'Spline Sans Mono', monospace", fontWeight: 700, fontSize: "24px", color: "#fff" }}>+{formatDollars(leadCents)}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: "12px", fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.7)" }}>Behind 1st</div>
+                        <div className="money" style={{ fontFamily: "var(--font-spline), 'Spline Sans Mono', monospace", fontWeight: 700, fontSize: "24px", color: "#fff" }}>
+                          {formatDollars((standings[0]?.cents ?? 0) - myEntry.cents)}
+                        </div>
+                      </>
+                    )}
+                    <Link href="/standings" className="btn btn-gold btn-sm" style={{ marginTop: "14px" }}>Full standings →</Link>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* No tournament */}
+            {!tournament && (
+              <section className="card card-pad" style={{ textAlign: "center", padding: "48px 24px" }}>
+                <div style={{ fontSize: "40px", marginBottom: "12px" }}>⚽</div>
+                <h2 style={{ fontSize: "18px", marginBottom: "6px" }}>No tournament yet</h2>
+                <p className="muted" style={{ fontSize: "14px" }}>A tournament will appear here once it&apos;s created. Stay tuned!</p>
+              </section>
+            )}
+
+            {/* Today's matches */}
+            <section>
+              <div className="sec-head">
+                <h2>Today&apos;s matches</h2>
+                <Link href="/standings" className="tag-soft" style={{ fontWeight: 700 }}>Bracket →</Link>
+              </div>
+              {todayDbMatches.length === 0 ? (
+                <div className="card card-pad" style={{ textAlign: "center", color: "var(--ink-faint)", fontSize: "14px" }}>
+                  No matches scheduled for today.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px" }}>
+                  {todayDbMatches.map((m) => {
+                    const homeWon = m.played && ((m.homeScore ?? 0) > (m.awayScore ?? 0) || m.penaltyWinner === m.homeTeam);
+                    const awayWon = m.played && ((m.awayScore ?? 0) > (m.homeScore ?? 0) || m.penaltyWinner === m.awayTeam);
+                    const kickoff = fmtTime(m.matchDate?.toISOString());
+
+                    const mr: MatchResult = {
+                      stage: m.stage as MatchResult["stage"],
+                      tournamentType: (tournament?.type ?? "world_cup") as MatchResult["tournamentType"],
+                      homeTeam: m.homeTeam, awayTeam: m.awayTeam,
+                      homeScore: m.homeScore ?? 0, awayScore: m.awayScore ?? 0,
+                      penaltyWinner: m.penaltyWinner ?? null,
+                    };
+
+                    const payouts = payoutRules ? playerIds.flatMap((uid: string) => {
+                      const teams = teamsByPlayer.get(uid) ?? new Set<string>();
+                      const cents = matchEarningsCents(mr, teams.has(m.homeTeam), teams.has(m.awayTeam), payoutRules);
+                      if (cents === 0) return [];
+                      const u = userById.get(uid);
+                      return [{ playerId: uid, playerName: u?.name ?? u?.email?.split("@")[0] ?? "?", colorIdx: colorOf(uid), cents }];
+                    }) : [];
+
+                    return (
+                      <div key={m.id} className="card" style={{ padding: "14px 15px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "11px" }}>
+                          <span className="kicker">{STAGE_LABELS[m.stage] ?? m.stage}{m.groupName ? ` · Grp ${m.groupName}` : ""}</span>
+                          {m.played
+                            ? <span className="badge grass" style={{ height: "20px" }}>Final</span>
+                            : <span className="tag-soft" style={{ fontWeight: 700 }}>{kickoff ?? ""}</span>
+                          }
+                        </div>
+                        {/* Home team */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 0", opacity: m.played && !homeWon ? .5 : 1 }}>
+                          <CountryFlag code={m.homeTeam} label={TEAMS_BY_CODE.get(m.homeTeam)?.name ?? m.homeTeam} className="fi-rect flag-lg" />
+                          <span style={{ fontWeight: 700, fontSize: "15px", flex: 1 }}>{TEAMS_BY_CODE.get(m.homeTeam)?.name ?? m.homeTeam}</span>
+                          {m.played && <span className="mono" style={{ fontWeight: 700, fontSize: "18px" }}>{m.homeScore}</span>}
+                        </div>
+                        {!m.played && <div className="faint" style={{ fontSize: "13px", fontWeight: 600, paddingLeft: "40px" }}>vs</div>}
+                        {/* Away team */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 0", opacity: m.played && !awayWon ? .5 : 1 }}>
+                          <CountryFlag code={m.awayTeam} label={TEAMS_BY_CODE.get(m.awayTeam)?.name ?? m.awayTeam} className="fi-rect flag-lg" />
+                          <span style={{ fontWeight: 700, fontSize: "15px", flex: 1 }}>{TEAMS_BY_CODE.get(m.awayTeam)?.name ?? m.awayTeam}</span>
+                          {m.played && <span className="mono" style={{ fontWeight: 700, fontSize: "18px" }}>{m.awayScore}</span>}
+                        </div>
+                        {m.penaltyWinner && <div style={{ fontSize: "11px", color: "var(--gold-deep)", fontWeight: 600, paddingLeft: "40px" }}>pen</div>}
+                        {payouts.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "11px", paddingTop: "11px", borderTop: "1px solid var(--line-soft)" }}>
+                            {payouts.map((p) => (
+                              <span key={p.playerId} className={`m-chip m${p.colorIdx}`}>
+                                <span className="mdot"></span>
+                                {p.playerName}
+                                {p.cents > 0 && <b className="mono" style={{ fontSize: "11px" }}>+{formatDollars(p.cents)}</b>}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </section>
-          )}
 
-          {/* No tournament at all */}
-          {!tournament && (
-            <section className="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-6 py-10 text-center">
-              <div className="text-4xl mb-3">⚽</div>
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">No tournament yet</h2>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                A tournament will appear here once it&apos;s created. Stay tuned!
-              </p>
-            </section>
-          )}
-
-          {/* Today's Matches */}
-          <section>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
-                Today&apos;s Matches
-              </h2>
-              {showLiveSync && <LiveSync />}
-            </div>
-
-            {todayDbMatches.length === 0 ? (
-              <div className="rounded-2xl border border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 px-5 py-8 text-center text-sm text-zinc-400 dark:text-zinc-500">
-                No matches scheduled for today.
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {todayDbMatches.map((m) => {
-                  const homeWon = m.played && ((m.homeScore ?? 0) > (m.awayScore ?? 0) || m.penaltyWinner === m.homeTeam);
-                  const awayWon = m.played && ((m.awayScore ?? 0) > (m.homeScore ?? 0) || m.penaltyWinner === m.awayTeam);
-                  const kickoff = fmtTime(m.matchDate?.toISOString());
-
-                  const mr: MatchResult = {
-                    stage: m.stage as MatchResult["stage"],
-                    tournamentType: (tournament?.type ?? "world_cup") as MatchResult["tournamentType"],
-                    homeTeam: m.homeTeam, awayTeam: m.awayTeam,
-                    homeScore: m.homeScore ?? 0, awayScore: m.awayScore ?? 0,
-                    penaltyWinner: m.penaltyWinner ?? null,
-                  };
-
-                  const payouts = playerIds.flatMap((uid: string) => {
-                    const teams = teamsByPlayer.get(uid) ?? new Set<string>();
-                    const cents = matchEarningsCents(mr, teams.has(m.homeTeam), teams.has(m.awayTeam));
-                    if (cents === 0) return [];
-                    const u = userById.get(uid);
-                    return [{ playerId: uid, playerName: u?.name ?? u?.email?.split("@")[0] ?? "?", colorIdx: playerIds.indexOf(uid), cents }];
-                  });
-
-                  return (
-                    <div key={m.id} className={`rounded-2xl border p-4 ${
-                      m.played
-                        ? "border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5"
-                        : "border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5"
-                    }`}>
-                      <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                        <span>{STAGE_LABELS[m.stage] ?? m.stage}{m.groupName ? ` · Grp ${m.groupName}` : ""}</span>
-                        {kickoff && !m.played && <span>{kickoff}</span>}
-                        {m.played && <span className="text-emerald-600 dark:text-emerald-400">Final</span>}
-                      </div>
-                      {m.venue && !m.played && (
-                        <div className="mb-2 text-[10px] text-zinc-400 dark:text-zinc-500 truncate">{m.venue}</div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <div className={`flex min-w-0 flex-1 items-center gap-1.5 ${m.played && !homeWon ? "opacity-50" : ""}`}>
-                          <CountryFlag code={m.homeTeam} label={TEAMS_BY_CODE.get(m.homeTeam)?.name ?? m.homeTeam} className="h-5 w-7 shrink-0" />
-                          <span className="truncate text-sm font-semibold text-zinc-900 dark:text-white">{TEAMS_BY_CODE.get(m.homeTeam)?.name ?? m.homeTeam}</span>
-                        </div>
-                        <div className="shrink-0 text-center">
-                          {m.played ? (
-                            <span className="font-mono text-base font-bold text-zinc-900 dark:text-white">
-                              {m.homeScore}<span className="text-zinc-400 dark:text-zinc-500"> – </span>{m.awayScore}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-zinc-400 dark:text-zinc-500">vs</span>
-                          )}
-                          {m.penaltyWinner && <div className="text-[10px] text-amber-600 dark:text-amber-400">pens</div>}
-                        </div>
-                        <div className={`flex min-w-0 flex-1 flex-row-reverse items-center gap-1.5 ${m.played && !awayWon ? "opacity-50" : ""}`}>
-                          <CountryFlag code={m.awayTeam} label={TEAMS_BY_CODE.get(m.awayTeam)?.name ?? m.awayTeam} className="h-5 w-7 shrink-0" />
-                          <span className="truncate text-right text-sm font-semibold text-zinc-900 dark:text-white">{TEAMS_BY_CODE.get(m.awayTeam)?.name ?? m.awayTeam}</span>
-                        </div>
-                      </div>
-                      {payouts.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-zinc-100 dark:border-white/5 pt-3">
-                          {payouts.map((p) => (
-                            <span key={p.playerId} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${PLAYER_COLORS[p.colorIdx % PLAYER_COLORS.length]}`}>
-                              {p.playerName} +{formatDollars(p.cents)}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+            {/* Mini leaderboard */}
+            {standings.length > 0 && (
+              <section className="card card-pad">
+                <div className="sec-head" style={{ marginBottom: "6px" }}>
+                  <h2 style={{ fontSize: "20px" }}>Leaderboard</h2>
+                  <Link href="/standings" className="tag-soft" style={{ fontWeight: 700 }}>See all →</Link>
+                </div>
+                <div>
+                  {standings.slice(0, 5).map((s, i) => (
+                    <div key={s.uid} style={{
+                      display: "flex", alignItems: "center", gap: "12px",
+                      padding: "9px 4px", borderBottom: i < 4 ? "1px solid var(--line-soft)" : "0",
+                      borderRadius: "10px",
+                      background: s.uid === userId ? "var(--grass-soft)" : "transparent",
+                      paddingInline: s.uid === userId ? "10px" : "4px",
+                    }}>
+                      <span style={{ width: "22px", fontFamily: "var(--font-archivo), Archivo, sans-serif", fontWeight: 800, color: "var(--ink-faint)", textAlign: "center" }}>{i + 1}</span>
+                      <span className={`mdot m${colorOf(s.uid)}`}></span>
+                      <span style={{ fontWeight: 700, flex: 1 }}>
+                        {s.displayName}
+                        {s.uid === userId && <span className="faint" style={{ fontSize: "12px", fontWeight: 400 }}> (you)</span>}
+                      </span>
+                      <span className="money pos">{formatDollars(s.cents)}</span>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              </section>
             )}
-          </section>
-        </div>
-
-        {/* RSS Sidebar */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-20">
-            <RssFeed />
           </div>
-        </aside>
-      </div>
 
-      {/* RSS on mobile (below main content) */}
-      <div className="mt-8 lg:hidden">
-        <RssFeed />
+          {/* Right: news sidebar */}
+          <aside style={{ position: "sticky", top: "80px", display: "grid", gap: "18px" }}>
+            <RssFeed />
+          </aside>
+        </div>
       </div>
     </main>
   );
 }
+
+
+

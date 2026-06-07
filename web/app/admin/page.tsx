@@ -7,7 +7,7 @@ import { CopyButton } from "@/components/CopyButton";
 import DraftOrderPicker from "@/components/DraftOrderPicker";
 import { authOptions } from "@/lib/auth";
 import { postDraftStarted } from "@/lib/discord";
-import { activateDraft, resetDraftOrder } from "@/lib/draft";
+import { activateDraft, presetDraftOrder, resetDraftOrder } from "@/lib/draft";
 import { DEFAULT_PAYOUT_RULES, resolvePayoutRules, type PayoutRules } from "@/lib/earnings";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
@@ -204,6 +204,21 @@ export default async function AdminPage({
     if (!allowed.includes(status)) redirect("/admin?error=Invalid+status");
     await prisma.tournament.update({ where: { id: tournamentId }, data: { status } });
     redirect("/admin?msg=Status+updated");
+  }
+
+  async function presetDraftOrderAction(formData: FormData) {
+    "use server";
+    await requireAdmin();
+    const tournamentId = String(formData.get("tournamentId") ?? "").trim();
+    if (!tournamentId) redirect("/admin");
+    try {
+      await presetDraftOrder(tournamentId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg === "NO_PARTICIPANTS") redirect("/admin?error=No+participants+enrolled+yet");
+      redirect("/admin?error=Could+not+preset+draft+order");
+    }
+    redirect("/admin?msg=Draft+order+randomized+%E2%80%94+draft+will+start+at+scheduled+time");
   }
 
   async function resetDraftAction(formData: FormData) {
@@ -503,10 +518,10 @@ export default async function AdminPage({
                             action={startDraftAction}
                             submitLabel="Start Draft with This Order"
                           />
-                          <form action={startDraftAction} className="mt-2">
+                          <form action={presetDraftOrderAction} className="mt-2">
                             <input type="hidden" name="tournamentId" value={t.id} />
                             <button type="submit" className="h-7 w-full rounded-lg bg-zinc-200 dark:bg-white/10 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-white/20">
-                              🔀 Randomize &amp; Start Draft
+                              🔀 Randomize Order (start at scheduled time)
                             </button>
                           </form>
                         </div>
@@ -515,7 +530,35 @@ export default async function AdminPage({
                   )}
 
                   {t.status === "upcoming" && draftRecord && (
-                    <span className="text-xs text-zinc-400 dark:text-zinc-600 italic">Draft record exists (will activate at scheduled time)</span>
+                    <div className="w-full mt-1 space-y-2">
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                        ✓ Draft order pre-set — will activate at scheduled time
+                      </p>
+                      {draftOrderIds.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {draftOrderIds.map((uid, idx) => {
+                            const u = userById.get(uid);
+                            return (
+                              <span key={uid} className="rounded-full bg-zinc-200 dark:bg-white/10 px-2 py-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+                                {idx + 1}. {u?.name ?? u?.email ?? "?"}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <form action={presetDraftOrderAction}>
+                        <input type="hidden" name="tournamentId" value={t.id} />
+                        <button type="submit" className="h-7 rounded-lg bg-zinc-200 dark:bg-white/10 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-white/20">
+                          🔀 Re-randomize
+                        </button>
+                      </form>
+                      <form action={startDraftAction}>
+                        <input type="hidden" name="tournamentId" value={t.id} />
+                        <button type="submit" className="h-7 rounded-lg bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-600">
+                          ▶ Start Now
+                        </button>
+                      </form>
+                    </div>
                   )}
 
                   {t.status === "draft" && draftRecord && (

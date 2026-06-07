@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WorldCuppy — Standings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .stand-grid { display:grid; grid-template-columns: 1fr 300px; gap: 22px; align-items:start; }
+  @media (max-width: 940px){ .stand-grid { grid-template-columns: 1fr; } }
+
+  .lb-row {
+    display:grid; grid-template-columns: 48px 1fr auto; gap: 14px; align-items:center;
+    padding: 13px 14px; border-bottom: 1px solid var(--line-soft);
+  }
+  .lb-row:last-child { border-bottom:0; }
+  .lb-row.you { background: var(--grass-soft); border-radius: 12px; }
+  .lb-pos { font-family:'Archivo'; font-weight:900; font-size:20px; color:var(--ink-faint); text-align:center; }
+  .lb-pos.gold { color: var(--gold); } .lb-pos.silver{ color:#9aa0a6; } .lb-pos.bronze{ color:#b07d4e; }
+  .lb-name { font-family:'Archivo'; font-weight:800; font-size:17px; display:flex; align-items:center; gap:9px; }
+  .lb-teams { display:flex; gap:5px; margin-top:6px; flex-wrap:wrap; }
+  .lb-earn { font-family:'Spline Sans Mono'; font-weight:700; font-size:20px; text-align:right; }
+  .lb-earn .d { font-size:12px; color:var(--ink-faint); font-weight:600; }
+
+  .rules { font-size:13.5px; }
+  .rules .rr { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px dashed var(--line-soft); white-space:nowrap; }
+  .rules .rr:last-child { border-bottom:0; }
+  .rules .rr .v { font-family:'Spline Sans Mono'; font-weight:600; color:var(--grass-deep); }
+
+  /* bracket */
+  .bracket { display:flex; gap: 28px; overflow-x:auto; padding: 6px 2px 16px; }
+  .br-col { flex:none; width: 230px; display:flex; flex-direction:column; }
+  .br-col > .ttl { font-family:'Archivo'; font-weight:700; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:12px; }
+  .br-col.qf { justify-content:space-around; }
+  .br-col.gap { gap: 22px; justify-content:center; }
+  .br-match { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:9px 11px; box-shadow:var(--shadow-sm); margin-bottom:16px; }
+  .br-team { display:flex; align-items:center; gap:8px; padding:4px 0; }
+  .br-team .nm { flex:1; font-weight:700; font-size:13.5px; }
+  .br-team .sc { font-family:'Spline Sans Mono'; font-weight:700; font-size:14px; }
+  .br-team.win .nm { color: var(--ink); }
+  .br-team.lose { opacity:.45; }
+  .br-team .owner { width:8px;height:8px;border-radius:50%; }
+  .br-mid { height:1px; background:var(--line-soft); margin:2px 0; }
+  .br-tbd { color:var(--ink-faint); font-style:normal; }
+</style>
+</head>
+<body>
+<main class="page" data-screen-label="Standings">
+  <div class="wrap">
+
+    <div class="between" style="margin-bottom:18px; flex-wrap:wrap; gap:10px">
+      <div>
+        <div class="kicker grass">Group Stage · Live</div>
+        <h1 style="font-size:clamp(28px,4vw,38px); margin-top:4px">Standings</h1>
+      </div>
+      <div class="seg">
+        <button class="on">Leaderboard</button>
+        <button onclick="document.getElementById('bracket').scrollIntoView({behavior:'smooth',block:'start'})">Bracket</button>
+      </div>
+    </div>
+
+    <div class="stand-grid">
+      <section class="card" style="padding:8px">
+        <div id="lb"></div>
+      </section>
+
+      <aside class="grid" style="gap:18px; position:sticky; top:80px">
+        <section class="card card-pad">
+          <div class="kicker" style="margin-bottom:4px">Pool</div>
+          <div class="between" style="margin-bottom:12px">
+            <h2 style="font-size:18px">Prize money</h2>
+            <span class="money gold" style="font-size:20px">$640</span>
+          </div>
+          <div class="row" style="gap:8px; font-size:13px" class="muted">
+            <span class="muted">8 managers · $80 buy-in</span>
+          </div>
+        </section>
+        <section class="card card-pad">
+          <h2 style="font-size:18px; margin-bottom:2px">Payout rules</h2>
+          <div class="tag-soft" style="margin-bottom:10px">Earnings per result</div>
+          <div class="rules" id="rules"></div>
+        </section>
+      </aside>
+    </div>
+
+    <!-- bracket -->
+    <section id="bracket" style="margin-top:34px">
+      <div class="sec-head"><h2>Knockout bracket</h2><span class="tag-soft">Owner color = whose team it is</span></div>
+      <div class="card" style="padding:18px 16px">
+        <div class="bracket" id="brk"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  WCChrome.nav("Standings", { admin: true });
+  const WC = window.WC;
+
+  // leaderboard
+  const medal = ["gold","silver","bronze"];
+  document.getElementById("lb").innerHTML = WC.STANDINGS.map((s,i) => {
+    const m = WC.mgr(s.mgr);
+    const teams = WC.OWNED[s.mgr].map(c=>WC.flag(c,'md')).join("");
+    const lead = i===0 ? "leader" : "−"+WC.money(WC.STANDINGS[0].cents - s.cents).slice(0);
+    return `<div class="lb-row ${m.you?'you':''}">
+      <div class="lb-pos ${medal[i]||''}">${i+1}</div>
+      <div>
+        <div class="lb-name"><span class="mdot m${s.mgr}"></span>${m.name}${m.you?' <span class="tag-soft" style="font-weight:600">you</span>':''}</div>
+        <div class="lb-teams">${teams}</div>
+      </div>
+      <div>
+        <div class="lb-earn money pos">${WC.money(s.cents)}</div>
+        <div class="d">${i===0?'leader':'−'+WC.money(WC.STANDINGS[0].cents - s.cents)}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // payout rules (from the original spreadsheet)
+  const RULES = [
+    ["Group win","$3.00"],["Group tie","$1.00"],["Goal difference","$0.25"],
+    ["Round of 16","$5.00"],["Quarter-final","$10.00"],["Semi-final","$15.00"],
+    ["3rd place","$10.00"],["Runner-up","$10.00"],["🏆 Champion","$20.00"],
+  ];
+  document.getElementById("rules").innerHTML = RULES.map(([k,v])=>`<div class="rr"><span>${k}</span><span class="v">${v}</span></div>`).join("");
+
+  // bracket
+  function brMatch(mt){
+    const winH = mt.played && (mt.hs>mt.as || mt.pw===mt.home);
+    const winA = mt.played && (mt.as>mt.hs || mt.pw===mt.away);
+    const oH = WC.ownerOf(mt.home), oA = WC.ownerOf(mt.away);
+    const line = (code, win, score, oi) => {
+      if (code==="—") return `<div class="br-team"><span class="br-tbd" style="flex:1;font-weight:700;font-size:13.5px">TBD</span></div>`;
+      return `<div class="br-team ${mt.played?(win?'win':'lose'):''}">
+        ${WC.flag(code,'md')}
+        <span class="nm">${WC.TEAM[code].name}</span>
+        ${oi!==null?`<span class="owner m${oi}" style="background:var(--m)"></span>`:''}
+        ${mt.played?`<span class="sc">${score}${mt.pw===code?' <span class="tag-soft">p</span>':''}</span>`:`<span class="tag-soft">·</span>`}
+      </div>`;
+    };
+    return `<div class="br-match">${line(mt.home,winH,mt.hs,oH)}<div class="br-mid"></div>${line(mt.away,winA,mt.as,oA)}</div>`;
+  }
+  document.getElementById("brk").innerHTML = `
+    <div class="br-col"><div class="ttl">Round of 16</div>${WC.STAGES.r16.map(brMatch).join("")}</div>
+    <div class="br-col qf"><div class="ttl">Quarter-finals</div>${WC.STAGES.qf.map(brMatch).join("")}</div>
+    <div class="br-col gap"><div class="ttl">Semi-finals</div>${[{home:"—",away:"—",played:false},{home:"—",away:"—",played:false}].map(brMatch).join("")}</div>
+    <div class="br-col" style="justify-content:center"><div class="ttl">Final</div>${brMatch({home:"—",away:"—",played:false})}
+      <div class="center" style="margin-top:14px"><span class="badge gold" style="height:30px;font-size:14px;padding:0 16px">🏆 Champion · $20</span></div>
+    </div>`;
+</script>
+</body>
+</html>

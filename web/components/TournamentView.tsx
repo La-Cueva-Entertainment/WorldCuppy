@@ -96,7 +96,8 @@ export default function TournamentView({
   const isWorldCup = type === "world_cup" || !type;
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+    <main className="page">
+      <div className="wrap">
       {isDemo && (
         <div className="mb-6 flex items-center gap-3 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
           <span className="text-base">👀</span>
@@ -113,12 +114,15 @@ export default function TournamentView({
         </div>
       )}
 
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white">
-          {name} <span className="text-emerald-600 dark:text-emerald-400">{year}</span>
-        </h1>
+      <div className="mb-8 between" style={{ flexWrap: "wrap", gap: "10px" }}>
+        <div>
+          <div className="kicker grass">{status ?? "Standings"}</div>
+          <h1 style={{ fontSize: "clamp(26px,4vw,34px)", marginTop: "4px" }}>
+            {name} <span style={{ color: "var(--grass)" }}>{year}</span>
+          </h1>
+        </div>
         <div className="mt-1 flex items-center gap-3">
-          {!isDemo && status && <p className="text-sm text-zinc-500 dark:text-zinc-400 capitalize">{status}</p>}
+          {!isDemo && status && <span className="badge">{status}</span>}
           {showLiveSync && <LiveSync />}
         </div>
       </div>
@@ -320,6 +324,7 @@ export default function TournamentView({
             )}
           </div>
         </section>
+      </div>
       </div>
     </main>
   );

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WorldCuppy — News</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .news-grid { display:grid; grid-template-columns: 1fr 320px; gap:26px; align-items:start; }
+  @media (max-width:940px){ .news-grid{ grid-template-columns:1fr; } }
+
+  .thumb {
+    border-radius: var(--r-md); overflow:hidden; position:relative; background: var(--surface-2);
+    background-image: repeating-linear-gradient(135deg, var(--line-soft) 0 10px, transparent 10px 20px);
+    display:grid; place-items:center;
+  }
+  .thumb span { font-family:'Spline Sans Mono'; font-size:11px; color:var(--ink-faint); background:var(--surface); padding:3px 8px; border-radius:6px; border:1px solid var(--line); }
+
+  .feature { display:grid; grid-template-columns: 1fr; gap:0; overflow:hidden; }
+  .feature .thumb { height: 280px; }
+  .feature .body { padding: 20px 22px; }
+  .feature h2 { font-size: clamp(24px,3.4vw,32px); line-height:1.05; margin-top:8px; }
+  .feature p { color:var(--ink-soft); margin:10px 0 0; font-size:16px; }
+
+  .alist { display:grid; gap:0; }
+  .arow { display:grid; grid-template-columns: 132px 1fr; gap:16px; padding:18px 0; border-bottom:1px solid var(--line-soft); }
+  .arow:first-child { padding-top:6px; }
+  .arow:last-child { border-bottom:0; }
+  .arow .thumb { height:90px; }
+  .arow h3 { font-size:18px; line-height:1.2; margin-top:6px; }
+  .arow h3:hover { color:var(--grass-deep); }
+  .arow p { color:var(--ink-soft); font-size:14px; margin:7px 0 0; }
+  .arow .meta { font-size:12.5px; color:var(--ink-faint); margin-top:8px; }
+  @media (max-width:540px){ .arow{ grid-template-columns:1fr; } .arow .thumb{ height:140px; } }
+
+  .scorebox { padding:8px; }
+  .sb-row { display:flex; align-items:center; gap:9px; padding:9px 8px; border-bottom:1px solid var(--line-soft); }
+  .sb-row:last-child { border-bottom:0; }
+  .sb-row .nm { flex:1; font-weight:600; font-size:14px; }
+  .sb-row .sc { font-family:'Spline Sans Mono'; font-weight:700; font-size:14px; }
+  .sources { display:flex; flex-wrap:wrap; gap:8px; }
+  .source-pill { font-size:12.5px; font-weight:600; color:var(--ink-soft); border:1px solid var(--line); border-radius:999px; padding:5px 12px; }
+</style>
+</head>
+<body>
+<main class="page" data-screen-label="News">
+  <div class="wrap">
+    <div class="between" style="margin-bottom:20px; flex-wrap:wrap; gap:10px">
+      <div>
+        <div class="kicker grass">Aggregated · auto-updating</div>
+        <h1 style="font-size:clamp(28px,4vw,38px); margin-top:4px">Football News</h1>
+      </div>
+      <span class="badge grass"><span class="live-dot"></span> Live RSS</span>
+    </div>
+
+    <div class="news-grid">
+      <div>
+        <!-- feature -->
+        <article class="card feature" id="feature"></article>
+        <!-- list -->
+        <div class="alist" id="list" style="margin-top:22px"></div>
+      </div>
+
+      <aside class="grid" style="gap:18px; position:sticky; top:80px">
+        <section class="card scorebox">
+          <div class="kicker" style="padding:8px 8px 4px">Latest scores</div>
+          <div id="scores"></div>
+        </section>
+        <section class="card card-pad">
+          <h2 style="font-size:16px; margin-bottom:10px">Sources</h2>
+          <div class="sources">
+            <span class="source-pill">ESPN FC</span><span class="source-pill">BBC Sport</span>
+            <span class="source-pill">L'Équipe</span><span class="source-pill">Marca</span>
+            <span class="source-pill">The Athletic</span><span class="source-pill">Sky Sports</span>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  WCChrome.nav("News", { admin: true });
+  const WC = window.WC;
+  const N = WC.NEWS;
+  const tagClass = t => t==='Match'?'grass':t==='Draft'?'gold':t==='Injury'?'hot':'';
+
+  // feature = first
+  const f = N[0];
+  document.getElementById("feature").innerHTML = `
+    <div class="thumb"><span>match photo · ${f.title.split(' ').slice(0,2).join(' ')}</span></div>
+    <div class="body">
+      <span class="badge ${tagClass(f.tag)}">${f.tag}</span>
+      <h2>${f.title}</h2>
+      <p>${f.lead}</p>
+      <div class="tag-soft" style="margin-top:14px">${f.src} · ${f.time} ago</div>
+    </div>`;
+
+  // list = rest
+  document.getElementById("list").innerHTML = N.slice(1).map(n => `
+    <article class="arow">
+      <div class="thumb"><span>photo</span></div>
+      <div>
+        <span class="badge ${tagClass(n.tag)}" style="height:20px">${n.tag}</span>
+        <h3>${n.title}</h3>
+        <p>${n.lead}</p>
+        <div class="meta">${n.src} · ${n.time} ago</div>
+      </div>
+    </article>`).join("");
+
+  // scores sidebar
+  const all = WC.TODAY.concat(WC.STAGES.r16.filter(m=>m.played).slice(0,3));
+  document.getElementById("scores").innerHTML = all.slice(0,6).map(m => {
+    const played = m.played;
+    return `<div class="sb-row">
+      ${WC.flag(m.home,'sm')}<span class="nm">${WC.TEAM[m.home].name}</span>
+      <span class="sc">${played?m.hs:'–'}</span>
+      <span class="tag-soft">:</span>
+      <span class="sc">${played?m.as:'–'}</span>${WC.flag(m.away,'sm')}
+    </div>`;
+  }).join("");
+</script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WorldCuppy — My Teams</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .summary { display:grid; grid-template-columns: repeat(3,1fr); gap:14px; margin-bottom:26px; }
+  @media (max-width:620px){ .summary{ grid-template-columns:1fr; } }
+  .stat { padding: 16px 18px; }
+  .stat .k { font-family:'Archivo'; font-weight:700; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint); }
+  .stat .v { font-family:'Spline Sans Mono'; font-weight:700; font-size: clamp(26px,4vw,34px); margin-top:6px; }
+
+  .teams-col { display:grid; gap:16px; }
+  .tcard { display:grid; grid-template-columns: auto 1fr auto; gap:18px; align-items:center; padding: 18px 20px; }
+  @media (max-width:640px){ .tcard{ grid-template-columns:auto 1fr; } .tcard .earnbox{ grid-column:1/-1; text-align:left; border-top:1px solid var(--line-soft); padding-top:12px; } }
+  .tcard .crest { width:62px; height:44px; border-radius:6px; box-shadow: var(--shadow-md), inset 0 0 0 1px rgba(0,0,0,.1); }
+  .tcard .nm { font-family:'Archivo'; font-weight:800; font-size:21px; }
+  .tcard .sub { display:flex; align-items:center; gap:10px; margin-top:7px; flex-wrap:wrap; }
+  .form { display:flex; gap:4px; }
+  .form span { width:22px; height:22px; border-radius:6px; display:grid; place-items:center; font-family:'Archivo'; font-weight:800; font-size:11px; color:#fff; }
+  .form .w { background: var(--grass); } .form .d { background: var(--ink-faint); } .form .l { background: var(--hot); }
+  .tcard .earnbox { text-align:right; }
+  .tcard .earnbox .amt { font-family:'Spline Sans Mono'; font-weight:700; font-size:24px; }
+  .tcard .next { font-size:13px; color:var(--ink-soft); }
+
+  .slot-empty {
+    border:1.5px dashed var(--line); border-radius:var(--r-lg); padding:22px; text-align:center;
+    display:flex; flex-direction:column; align-items:center; gap:10px; background:var(--surface);
+  }
+</style>
+</head>
+<body>
+<main class="page" data-screen-label="My Teams">
+  <div class="wrap">
+
+    <div class="between" style="margin-bottom:18px; flex-wrap:wrap; gap:10px">
+      <div>
+        <div class="kicker grass">Nico · World Cup 2026</div>
+        <h1 style="font-size:clamp(28px,4vw,38px); margin-top:4px; white-space:nowrap">My Teams</h1>
+      </div>
+      <a href="Draft.html" class="btn btn-primary btn-sm">Go to draft →</a>
+    </div>
+
+    <div class="summary">
+      <div class="card stat"><div class="k">Total earnings</div><div class="v money pos">$81.75</div></div>
+      <div class="card stat"><div class="k">Pool position</div><div class="v">1<span style="font-size:.5em">st</span> <span class="tag-soft" style="font-size:14px">of 8</span></div></div>
+      <div class="card stat"><div class="k">Teams drafted</div><div class="v">3 <span class="tag-soft" style="font-size:14px">/ 4</span></div></div>
+    </div>
+
+    <div class="teams-col" id="teams"></div>
+  </div>
+</main>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  WCChrome.nav("My Teams", { admin: true });
+  const WC = window.WC;
+
+  // per-team detail for Nico's squad
+  const DETAIL = {
+    FRA: { earn:3275, form:["w","w","d"], next:"vs Mexico · today 11:00 AM", note:"Top of Group A" },
+    DEN: { earn:1500, form:["l","w","l"], next:"Eliminated · R16",          note:"Lost to Argentina" },
+    COL: { earn:3400, form:["w","w","w"], next:"vs Brazil · QF Sat",         next2:true, note:"Group winners" },
+  };
+  const tierMeta = Object.fromEntries(WC.TIERS.map(t=>[t.key,t]));
+
+  document.getElementById("teams").innerHTML = WC.OWNED[0].map(code => {
+    const t = WC.TEAM[code], d = DETAIL[code];
+    const tm = tierMeta[t.tier];
+    return `<div class="card tcard">
+      <span class="fi fi-${t.fi} fi-rect crest"></span>
+      <div>
+        <div class="nm">${t.name}</div>
+        <div class="sub">
+          <span class="tier tier-${t.tier}">${tm.name}</span>
+          <span class="tag-soft">FIFA #${t.rank}</span>
+          <span class="form">${d.form.map(f=>`<span class="${f}">${f.toUpperCase()}</span>`).join("")}</span>
+        </div>
+        <div class="next" style="margin-top:8px">${d.next} · <span class="muted">${d.note}</span></div>
+      </div>
+      <div class="earnbox">
+        <div class="tag-soft">Earned</div>
+        <div class="amt money pos">${WC.money(d.earn)}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // empty slot
+  document.getElementById("teams").insertAdjacentHTML("beforeend", `
+    <div class="slot-empty">
+      <span class="badge gold">1 pick remaining</span>
+      <div class="muted" style="font-size:14px">Your 4th team gets drafted in round 4. Tier still open — chase a jump payout.</div>
+      <a href="Draft.html" class="btn btn-ghost btn-sm">Open the draft</a>
+    </div>`);
+</script>
+</body>
+</html>

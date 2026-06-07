@@ -24,6 +24,7 @@ export default async function ProfilePage() {
   const upcomingParticipation = await prisma.tournamentParticipant.findFirst({
     where: { userId, tournament: { status: { in: ["upcoming", "draft"] } } },
     select: {
+      teamName: true,
       tournament: {
         select: { id: true, name: true, year: true, status: true, draftDate: true, teamsPerPlayer: true },
       },
@@ -31,6 +32,13 @@ export default async function ProfilePage() {
     orderBy: { joinedAt: "desc" },
   });
   const upcomingTournament = upcomingParticipation?.tournament ?? null;
+  const upcomingTeamName = upcomingParticipation?.teamName ?? null;
+
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
+  const userName = currentUser?.name ?? session.user.name ?? null;
 
   const tournament = await prisma.tournament.findFirst({
     where: { status: { in: ["active", "complete"] } },
@@ -133,6 +141,9 @@ export default async function ProfilePage() {
       totalEarnedCents={totalEarned}
       teams={teams}
       history={history}
+      userName={userName}
+      upcomingTeamName={upcomingTeamName}
+      upcomingTournamentId={upcomingTournament?.id ?? null}
     />
   );
 }

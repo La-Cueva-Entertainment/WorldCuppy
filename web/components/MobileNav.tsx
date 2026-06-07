@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { InstallButton } from "@/components/InstallButton";
 
 export function MobileNav({
   isAdmin,
@@ -21,59 +20,72 @@ export function MobileNav({
   const close = () => setOpen(false);
 
   return (
-    <div className="relative md:hidden">
+    <>
+      {/* Burger button — only visible on mobile (CSS hides nav-links at ≤860px) */}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close menu" : "Open menu"}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white transition-colors hover:bg-white/20"
+        className="icon-btn nav-burger"
+        style={{ display: "grid" }}
       >
         {open ? <XIcon /> : <HamburgerIcon />}
       </button>
 
-      {open && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-40" onClick={close} />
+      {/* Scrim */}
+      <div className={`drawer-back${open ? " open" : ""}`} onClick={close} />
 
-          {/* Dropdown panel */}
-          <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-white/10 bg-zinc-900 p-2 shadow-2xl">
-            {typeof picksCount === "number" && (
-              <div className="mb-1 px-3 py-2 text-xs font-semibold text-emerald-400">
-                {picksCount} picks
-              </div>
-            )}
+      {/* Slide-in drawer */}
+      <div className={`drawer${open ? " open" : ""}`}>
+        {/* Drawer header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+          <span style={{ fontFamily: "var(--font-archivo), Archivo, sans-serif", fontWeight: 900, fontSize: "17px", color: "var(--ink)" }}>
+            World<b style={{ color: "var(--gold)" }}>Cuppy</b>
+          </span>
+          <button type="button" onClick={close} className="icon-btn" aria-label="Close menu">
+            <XIcon />
+          </button>
+        </div>
 
-            <NavItem href="/" exact onClick={close}>Home</NavItem>
-            <NavItem href="/standings" onClick={close}>Standings</NavItem>
-            <NavItem href="/draft" onClick={close}>Draft</NavItem>
-            <NavItem href="/profile" onClick={close}>My Profile</NavItem>
-
-            {isAdmin && (
-              <>
-                <div className="my-1 border-t border-white/10" />
-                <NavItem href="/preview" onClick={close}>Preview</NavItem>
-                <NavItem href="/admin" onClick={close}>Admin</NavItem>
-              </>
-            )}
-
-            <div className="my-1 border-t border-white/10" />
-            <InstallButton variant="menu" />
-            <button
-              type="button"
-              onClick={async () => { await signOut({ redirect: false }); window.location.href = "/"; }}
-              className="flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
-            >
-              Sign out
-            </button>
+        {typeof picksCount === "number" && (
+          <div className="badge grass" style={{ marginBottom: "8px", alignSelf: "flex-start" }}>
+            {picksCount} picks
           </div>
-        </>
-      )}
-    </div>
+        )}
+
+        <DrawerLink href="/" exact onClick={close}>Home</DrawerLink>
+        <DrawerLink href="/standings" onClick={close}>Standings</DrawerLink>
+        <DrawerLink href="/draft" onClick={close}>Draft</DrawerLink>
+        <DrawerLink href="/lineup" onClick={close}>My Teams</DrawerLink>
+        <DrawerLink href="/news" onClick={close}>News</DrawerLink>
+        <DrawerLink href="/profile" onClick={close}>Profile</DrawerLink>
+
+        {isAdmin && (
+          <>
+            <hr className="divider" style={{ margin: "8px 0" }} />
+            <DrawerLink href="/admin" onClick={close}>Admin</DrawerLink>
+          </>
+        )}
+
+        <hr className="divider" style={{ margin: "8px 0" }} />
+        <button
+          type="button"
+          onClick={async () => { await signOut({ redirect: false }); window.location.href = "/"; }}
+          style={{
+            fontFamily: "var(--font-archivo), Archivo, sans-serif", fontWeight: 700,
+            fontSize: "17px", padding: "12px 10px", borderRadius: "10px",
+            color: "var(--ink-soft)", background: "none", border: "none",
+            cursor: "pointer", textAlign: "left", width: "100%",
+          }}
+        >
+          Sign out
+        </button>
+      </div>
+    </>
   );
 }
 
-function NavItem({
+function DrawerLink({
   href,
   exact = false,
   onClick,
@@ -90,15 +102,7 @@ function NavItem({
     : pathname === href || pathname.startsWith(href + "/");
 
   return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className={`flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-        isActive
-          ? "bg-white/15 text-white"
-          : "text-white/70 hover:bg-white/10 hover:text-white"
-      }`}
-    >
+    <Link href={href} onClick={onClick} className={isActive ? "active" : ""}>
       {children}
     </Link>
   );

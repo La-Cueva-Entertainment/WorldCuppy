@@ -6,10 +6,12 @@ import { usePathname } from "next/navigation";
 export function NavLink({
   href,
   exact = false,
+  className,
   children,
 }: {
   href: string;
   exact?: boolean;
+  className?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -20,11 +22,7 @@ export function NavLink({
   return (
     <Link
       href={href}
-      className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-        isActive
-          ? "bg-white/15 font-semibold text-white ring-1 ring-white/20"
-          : "font-medium text-white/70 hover:bg-white/10 hover:text-white"
-      }`}
+      className={`nav-link${isActive ? " active" : ""}${className ? " " + className : ""}`}
     >
       {children}
     </Link>

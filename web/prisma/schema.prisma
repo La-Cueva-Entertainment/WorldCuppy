@@ -102,6 +102,7 @@ model TournamentParticipant {
   tournamentId String
   userId       String
   joinedAt     DateTime @default(now())
+  teamName     String?
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)

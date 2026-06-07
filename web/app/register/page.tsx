@@ -7,13 +7,21 @@ import { signIn } from "next-auth/react";
 
 type Status = { kind: "idle" } | { kind: "loading" } | { kind: "error"; message: string };
 
+const inputStyle: React.CSSProperties = {
+  height: "46px", borderRadius: "11px", border: "1px solid var(--line)",
+  background: "var(--surface)", color: "var(--ink)", padding: "0 14px",
+  fontSize: "14px", outline: "none", width: "100%",
+  fontFamily: "var(--font-hanken), Hanken Grotesk, sans-serif",
+  transition: "border-color .15s, box-shadow .15s",
+};
+
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
 
   async function onRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -31,64 +39,82 @@ export default function RegisterPage() {
     await signIn("credentials", { email, password, callbackUrl, redirect: true });
   }
 
-  return (
-    <div className="min-h-screen">
-      <main className="mx-auto flex w-full max-w-lg flex-col gap-6 px-6 py-12">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">Create account</h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">Create an email/password account.</p>
-          </div>
-          <Link href="/login" className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white">
-            Sign in
-          </Link>
-        </div>
+  function focusStyle(e: React.FocusEvent<HTMLInputElement>) {
+    e.target.style.borderColor = "var(--grass)";
+    e.target.style.boxShadow = "0 0 0 3px var(--grass-soft)";
+  }
+  function blurStyle(e: React.FocusEvent<HTMLInputElement>) {
+    e.target.style.borderColor = "var(--line)";
+    e.target.style.boxShadow = "none";
+  }
 
-        <div className="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-6">
-          <form onSubmit={onRegister} className="grid gap-3">
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Name</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                type="text"
-                autoComplete="name"
-                className="h-11 rounded-xl border border-zinc-300 dark:border-white/10 bg-white dark:bg-white/5 px-3 text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-emerald-500"
-              />
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", minHeight: "calc(100vh - 60px)" }}>
+
+      {/* ── Left promo ── */}
+      <div className="pitch-panel hide-sm" style={{ padding: "clamp(32px,5vw,60px) clamp(24px,4vw,48px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div style={{ maxWidth: "420px" }}>
+          <h1 style={{ color: "#fff", fontSize: "clamp(28px,3.5vw,44px)", marginBottom: "16px" }}>
+            Join the pool.<br />Draft nations. <span style={{ color: "var(--gold)" }}>Win.</span>
+          </h1>
+          <p style={{ color: "rgba(255,255,255,.75)", fontSize: "15px", lineHeight: 1.6, marginBottom: "32px" }}>
+            Create your account and get invited to a friend group&apos;s pool. Snake draft your teams and compete for real money.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {[
+              ["🌍", "All major international tournaments"],
+              ["🐍", "Fair snake draft — everyone gets a shot"],
+              ["📊", "Live earnings, tracked every match"],
+            ].map(([icon, text]) => (
+              <div key={text} style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "rgba(255,255,255,.8)", fontWeight: 500 }}>
+                <span style={{ fontSize: "18px" }}>{icon}</span>
+                <span>{text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right: form ── */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "clamp(24px,4vw,48px) clamp(20px,4vw,40px)", background: "var(--paper)" }}>
+        <div style={{ width: "100%", maxWidth: "380px" }}>
+          <h1 style={{ fontSize: "26px", marginBottom: "6px" }}>Create account</h1>
+          <p className="muted" style={{ fontSize: "14px", marginBottom: "28px" }}>
+            Fill in your details to get started.
+          </p>
+
+          <form onSubmit={onRegister} style={{ display: "grid", gap: "14px" }}>
+            <label style={{ display: "grid", gap: "5px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink-soft)" }}>Display name</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} type="text" autoComplete="name" placeholder="Your name" style={inputStyle} onFocus={focusStyle} onBlur={blurStyle} />
             </label>
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Email</span>
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                autoComplete="email"
-                className="h-11 rounded-xl border border-zinc-300 dark:border-white/10 bg-white dark:bg-white/5 px-3 text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-emerald-500"
-                required
-              />
+            <label style={{ display: "grid", gap: "5px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink-soft)" }}>Email</span>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required style={inputStyle} onFocus={focusStyle} onBlur={blurStyle} />
             </label>
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Password</span>
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                autoComplete="new-password"
-                className="h-11 rounded-xl border border-zinc-300 dark:border-white/10 bg-white dark:bg-white/5 px-3 text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-emerald-500"
-                required
-              />
+            <label style={{ display: "grid", gap: "5px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink-soft)" }}>Password</span>
+              <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="new-password" required style={inputStyle} onFocus={focusStyle} onBlur={blurStyle} />
             </label>
             <button
               type="submit"
               disabled={status.kind === "loading"}
-              className="mt-2 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              className="btn btn-primary btn-block"
+              style={{ marginTop: "4px" }}
             >
-              Create account
+              {status.kind === "loading" ? "Creating…" : "Create account"}
             </button>
-            {status.kind === "error" && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{status.message}</p>}
+            {status.kind === "error" && (
+              <p style={{ color: "var(--hot)", fontSize: "13px", margin: 0 }}>{status.message}</p>
+            )}
           </form>
+
+          <p style={{ marginTop: "24px", textAlign: "center", fontSize: "14px", color: "var(--ink-soft)" }}>
+            Already have an account?{" "}
+            <Link href="/login" style={{ color: "var(--grass-deep)", fontWeight: 700 }}>Sign in →</Link>
+          </p>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

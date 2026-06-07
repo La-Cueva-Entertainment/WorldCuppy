@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo, Hanken_Grotesk, Spline_Sans_Mono } from "next/font/google";
 import Link from "next/link";
-import Image from "next/image";
 import { getServerSession } from "next-auth";
 import "./globals.css";
 
-import { AuthButtons } from "@/components/AuthButtons";
 import { MobileNav } from "@/components/MobileNav";
 import { NavLink } from "@/components/NavLink";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
@@ -14,21 +12,66 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const archivo = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const hanken = Hanken_Grotesk({
+  variable: "--font-hanken",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const splineMono = Spline_Sans_Mono({
+  variable: "--font-spline",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? "https://worldcuppy.lacueva.us"),
   title: "World Cuppy",
   description: "International Fantasy Fútbol - Draft Nations",
+  icons: {
+    icon: [
+      { url: "/icon/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icon/worldcuppy-icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/icon/apple-touch-icon.png",
+  },
 };
+
+/** Brand trophy mark — worldcuppy-mark.svg rendered inline */
+function BallMark() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        background: "linear-gradient(160deg,#1a8a4e,#0c5e34)",
+        flexShrink: 0,
+      }}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="#f0d98a" width="24" height="24" aria-hidden="true">
+        <rect x="12.5" y="6.5" width="23" height="4.6" rx="1.7"/>
+        <path d="M14 11.5 H34 V16 C34 24.5 29.4 28.5 24 28.5 C18.6 28.5 14 24.5 14 16 Z"/>
+        <path d="M14.2 13 C7 13 7 21.5 14.8 21.5" fill="none" stroke="#f0d98a" strokeWidth="3"/>
+        <path d="M33.8 13 C41 13 41 21.5 33.2 21.5" fill="none" stroke="#f0d98a" strokeWidth="3"/>
+        <rect x="22.1" y="28" width="3.8" height="4.4"/>
+        <rect x="17.5" y="32" width="13" height="3" rx="1.2"/>
+        <path d="M15 41.5 L17.2 35.5 H30.8 L33 41.5 Z"/>
+      </svg>
+    </span>
+  );
+}
 
 export default async function RootLayout({
   children,
@@ -75,71 +118,76 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Apply stored theme before first paint to avoid flash */}
         <script dangerouslySetInnerHTML={{ __html: `
           try {
-            var t = localStorage.getItem('theme') ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            var t = localStorage.getItem('wc_theme') ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
             document.documentElement.classList.toggle('dark', t === 'dark');
           } catch(e) {}
         `}} />
         <link rel="manifest" href="/manifest.webmanifest" />
-        <meta name="theme-color" content="#18181b" />
+        <meta name="theme-color" content="#0c5e34" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="World Cuppy" />
-        <link rel="apple-touch-icon" href="/wcball-icon.png" />
+        <link rel="icon" type="image/svg+xml" href="/icon/worldcuppy-icon.svg" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icon/favicon-32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icon/favicon-16.png" />
+        <link rel="apple-touch-icon" href="/icon/apple-touch-icon.png" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${archivo.variable} ${hanken.variable} ${splineMono.variable}`}>
         <ServiceWorkerRegister />
-        <div className="min-h-screen">
-          {/* Nav — always dark */}
-          <div className="sticky top-0 z-30 bg-zinc-900">
-            <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-6 py-1">
-              <Link
-                href="/"
-                aria-label="World Cuppy home"
-                className="flex items-center gap-2"
-              >
-                <Image src="/wcball.png" alt="" width={88} height={88} className="transition-transform duration-200 hover:rotate-12 hover:scale-110" />
-                <span className="text-base font-bold text-white sm:text-lg">
-                  World <span className="text-yellow-400">Cuppy</span>
-                </span>
-              </Link>
 
-              {session && (
-                <nav className="hidden items-center gap-1 md:flex">
-                  <NavLink href="/" exact>Home</NavLink>
-                  <NavLink href="/standings">Standings</NavLink>
-                  <NavLink href="/draft">Draft</NavLink>
-                  {(isAdmin || siteOwner) && (
-                    <NavLink href="/preview">Preview</NavLink>
-                  )}
-                  {(isAdmin || siteOwner) && (
-                    <Link href="/admin" className="rounded-lg px-3 py-1.5 text-sm font-medium text-yellow-300 transition-colors hover:bg-white/10 hover:text-yellow-200">
-                      Admin
-                    </Link>
-                  )}
-                </nav>
-              )}
+        {/* ── Top nav ───────────────────────────────────── */}
+        <header className="nav">
+          <div className="nav-in">
+            {/* Brand */}
+            <Link href="/" aria-label="World Cuppy home" className="nav-brand">
+              <BallMark />
+              <span className="wm">World<b>Cuppy</b></span>
+            </Link>
 
-              <div className="flex items-center gap-2">
-                <ThemeToggle />
-                <AuthButtons
-                  signedIn={Boolean(session)}
-                  picksCount={picksCount}
-                  isAdmin={isAdmin || siteOwner}
-                />
-                {session && (
-                  <MobileNav isAdmin={isAdmin || siteOwner} picksCount={picksCount} />
+            {/* Desktop nav links */}
+            {session && (
+              <nav className="nav-links">
+                <NavLink href="/" exact>Home</NavLink>
+                <NavLink href="/standings">Standings</NavLink>
+                <NavLink href="/draft">Draft</NavLink>
+                <NavLink href="/lineup">My Teams</NavLink>
+                <NavLink href="/news">News</NavLink>
+                {(isAdmin || siteOwner) && (
+                  <NavLink href="/admin" className="adm">Admin</NavLink>
                 )}
-              </div>
+              </nav>
+            )}
+
+            <div className="nav-spacer" />
+
+            {/* Right cluster */}
+            <div className="nav-right">
+              <ThemeToggle />
+              {session ? (
+                <>
+                  <Link
+                    href="/profile"
+                    aria-label="My profile"
+                    className="nav-avatar"
+                    title={session.user.name ?? session.user.email ?? "Profile"}
+                  >
+                    {(session.user.name ?? session.user.email ?? "?")[0].toUpperCase()}
+                  </Link>
+                  <MobileNav isAdmin={isAdmin || siteOwner} picksCount={picksCount} />
+                </>
+              ) : (
+                <Link href="/login" className="btn btn-primary btn-sm">Sign in</Link>
+              )}
             </div>
           </div>
+        </header>
 
-          <div>{children}</div>
-        </div>
+        <div>{children}</div>
       </body>
     </html>
   );

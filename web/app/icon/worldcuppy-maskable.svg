@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="WorldCuppy">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a8a4e"></stop>
+      <stop offset="1" stop-color="#0c5e34"></stop>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#g)"></rect>
+  <g transform="translate(256,256) scale(6.9) translate(-24,-24)" fill="#f0d98a">
+    <rect x="12.5" y="6.5" width="23" height="4.6" rx="1.7"></rect>
+    <path d="M14 11.5 H34 V16 C34 24.5 29.4 28.5 24 28.5 C18.6 28.5 14 24.5 14 16 Z"></path>
+    <path d="M14.2 13 C7 13 7 21.5 14.8 21.5" fill="none" stroke="#f0d98a" stroke-width="3"></path>
+    <path d="M33.8 13 C41 13 41 21.5 33.2 21.5" fill="none" stroke="#f0d98a" stroke-width="3"></path>
+    <rect x="22.1" y="28" width="3.8" height="4.4"></rect>
+    <rect x="17.5" y="32" width="13" height="3" rx="1.2"></rect>
+    <path d="M15 41.5 L17.2 35.5 H30.8 L33 41.5 Z"></path>
+  </g>
+</svg>

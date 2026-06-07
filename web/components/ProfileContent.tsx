@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState, useTransition } from "react";
 
 import { CountryFlag } from "@/components/CountryFlag";
 import { CountdownTimer } from "@/components/CountdownTimer";
@@ -41,6 +44,9 @@ export interface ProfileContentProps {
   history: { id: string; name: string; year: number; teamCodes: string[] }[];
   draftHref?: string;
   disableTournamentLinks?: boolean;
+  userName?: string | null;
+  upcomingTeamName?: string | null;
+  upcomingTournamentId?: string | null;
 }
 
 function fmtPST(d: Date | null): string | null {
@@ -61,10 +67,73 @@ export default function ProfileContent({
   history,
   draftHref = "/draft",
   disableTournamentLinks = false,
+  userName: initialUserName = null,
+  upcomingTeamName: initialTeamName = null,
+  upcomingTournamentId = null,
 }: ProfileContentProps) {
+  const [name, setName] = useState(initialUserName ?? "");
+  const [teamName, setTeamName] = useState(initialTeamName ?? "");
+  const [saved, setSaved] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSave() {
+    startTransition(async () => {
+      await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          ...(upcomingTournamentId ? { tournamentId: upcomingTournamentId, teamName } : {}),
+        }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    });
+  }
+
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
       <h1 className="mb-6 text-2xl font-extrabold text-zinc-900 dark:text-white">My Profile</h1>
+
+      {/* Settings */}
+      <div className="mb-6 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-5 space-y-3">
+          <label className="grid gap-1">
+            <span className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Your name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={64}
+              className="h-10 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500"
+            />
+          </label>
+          {upcomingTournamentId && (
+            <label className="grid gap-1">
+              <span className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Team name</span>
+              <input
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                maxLength={64}
+                placeholder="e.g. The Underdogs FC"
+                className="h-10 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 px-3 text-sm text-zinc-900 dark:text-white outline-none focus:border-emerald-500 placeholder:text-zinc-400"
+              />
+            </label>
+          )}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isPending}
+            className="h-9 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+          >
+            {isPending ? "Saving…" : "Save"}
+          </button>
+        </div>
+
+
+      {saved && (
+        <div className="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+          Profile updated ✓
+        </div>
+      )}
 
       {/* Upcoming / Draft tournament card */}
       {upcomingTournament && (

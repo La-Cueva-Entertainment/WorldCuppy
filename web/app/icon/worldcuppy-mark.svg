@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="currentColor" role="img" aria-label="WorldCuppy">
+  <rect x="12.5" y="6.5" width="23" height="4.6" rx="1.7"></rect>
+  <path d="M14 11.5 H34 V16 C34 24.5 29.4 28.5 24 28.5 C18.6 28.5 14 24.5 14 16 Z"></path>
+  <path d="M14.2 13 C7 13 7 21.5 14.8 21.5" fill="none" stroke="currentColor" stroke-width="3"></path>
+  <path d="M33.8 13 C41 13 41 21.5 33.2 21.5" fill="none" stroke="currentColor" stroke-width="3"></path>
+  <rect x="22.1" y="28" width="3.8" height="4.4"></rect>
+  <rect x="17.5" y="32" width="13" height="3" rx="1.2"></rect>
+  <path d="M15 41.5 L17.2 35.5 H30.8 L33 41.5 Z"></path>
+</svg>

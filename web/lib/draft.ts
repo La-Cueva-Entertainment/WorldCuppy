@@ -20,17 +20,48 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+/** Pre-saves a randomized (or manual) draft order as a "pending" draft record
+ *  without starting the draft. The tournament stays "upcoming" so the scheduled
+ *  timer still controls when it activates. */
+export async function presetDraftOrder(tournamentId: string, manualOrder?: string[]): Promise<string[]> {
+  const participants = await prisma.tournamentParticipant.findMany({
+    where: { tournamentId },
+    select: { userId: true },
+  });
+  if (participants.length === 0) throw new Error("NO_PARTICIPANTS");
+
+  const participantIds = new Set(participants.map((p) => p.userId));
+  let orderUserIds: string[];
+  if (manualOrder && manualOrder.length > 0) {
+    const valid =
+      manualOrder.length === participantIds.size &&
+      manualOrder.every((id) => participantIds.has(id));
+    if (!valid) throw new Error("INVALID_ORDER");
+    orderUserIds = manualOrder;
+  } else {
+    orderUserIds = shuffle(participants.map((p) => p.userId));
+  }
+
+  await prisma.tournamentDraft.upsert({
+    where: { tournamentId },
+    create: { tournamentId, status: "pending", orderUserIds, currentPick: 0 },
+    update: { orderUserIds },
+  });
+  return orderUserIds;
+}
+
 /** Creates the TournamentDraft and flips the tournament to "draft" status.
  *  If `manualOrder` is provided it is used as-is; otherwise participants are
- *  shuffled randomly.  Safe to call concurrently — the second caller will
- *  silently no-op if another request beat it. */
+ *  shuffled randomly.  If a "pending" draft record already exists (pre-set order),
+ *  its order is used unless `manualOrder` overrides it.
+ *  Safe to call concurrently — the second caller will silently no-op. */
 export async function activateDraft(tournamentId: string, manualOrder?: string[]): Promise<string[]> {
-  // No-op if already activated
+  // No-op if already activated or complete
   const existing = await prisma.tournamentDraft.findUnique({
     where: { tournamentId },
-    select: { tournamentId: true, orderUserIds: true },
+    select: { tournamentId: true, orderUserIds: true, status: true },
   });
-  if (existing) return existing.orderUserIds as string[];
+  if (existing && existing.status !== "pending") return existing.orderUserIds as string[];
 
   const participants = await prisma.tournamentParticipant.findMany({
     where: { tournamentId },
@@ -42,20 +73,24 @@ export async function activateDraft(tournamentId: string, manualOrder?: string[]
 
   let orderUserIds: string[];
   if (manualOrder && manualOrder.length > 0) {
-    // Validate: must be exactly the same set of participant IDs
     const valid =
       manualOrder.length === participantIds.size &&
       manualOrder.every((id) => participantIds.has(id));
     if (!valid) throw new Error("INVALID_ORDER");
     orderUserIds = manualOrder;
+  } else if (existing && (existing.orderUserIds as string[]).length > 0) {
+    // Promote the pre-set pending order
+    orderUserIds = existing.orderUserIds as string[];
   } else {
     orderUserIds = shuffle(participants.map((p) => p.userId));
   }
 
   try {
     await prisma.$transaction([
-      prisma.tournamentDraft.create({
-        data: { tournamentId, status: "active", orderUserIds, currentPick: 0 },
+      prisma.tournamentDraft.upsert({
+        where: { tournamentId },
+        create: { tournamentId, status: "active", orderUserIds, currentPick: 0 },
+        update: { status: "active", orderUserIds },
       }),
       prisma.tournament.update({
         where: { id: tournamentId },
