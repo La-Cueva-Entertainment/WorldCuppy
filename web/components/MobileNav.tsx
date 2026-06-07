@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 
@@ -13,24 +14,16 @@ export function MobileNav({
   picksCount?: number | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
 
+  useEffect(() => { setMounted(true); }, []);
   useEffect(() => { setOpen(false); }, [pathname]);
 
   const close = () => setOpen(false);
 
-  return (
+  const overlay = mounted ? createPortal(
     <>
-      {/* Burger button — only visible on mobile (CSS hides nav-links at ≤860px) */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-label={open ? "Close menu" : "Open menu"}
-        className="icon-btn nav-burger"
-      >
-        {open ? <XIcon /> : <HamburgerIcon />}
-      </button>
-
       {/* Scrim */}
       <div className={`drawer-back${open ? " open" : ""}`} onClick={close} />
 
@@ -80,6 +73,23 @@ export function MobileNav({
           Sign out
         </button>
       </div>
+    </>,
+    document.body
+  ) : null;
+
+  return (
+    <>
+      {/* Burger button — only visible on mobile (CSS hides nav-links at ≤860px) */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label={open ? "Close menu" : "Open menu"}
+        className="icon-btn nav-burger"
+      >
+        {open ? <XIcon /> : <HamburgerIcon />}
+      </button>
+
+      {overlay}
     </>
   );
 }
