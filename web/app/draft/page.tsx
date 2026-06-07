@@ -237,7 +237,7 @@ export default async function DraftPage({
           pickNumber: _pickAt + 1,
           totalPicks: _maxPicks,
           nextPickerName: nextPickerUser ? (nextPickerUser.name ?? nextPickerUser.email ?? "?") : null,
-          tournamentName: `${tournament.name} ${tournament.year}`,
+          tournamentName: tournament ? `${tournament.name} ${tournament.year}` : "Draft",
           draftUrl: `${siteBase}/draft`,
           isDraftComplete,
         });
