@@ -20,10 +20,11 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-/** Creates the TournamentDraft with a randomized player order and flips the
- *  tournament to "draft" status. Safe to call concurrently — the second caller
- *  will silently no-op if another request beat it. */
-export async function activateDraft(tournamentId: string): Promise<void> {
+/** Creates the TournamentDraft and flips the tournament to "draft" status.
+ *  If `manualOrder` is provided it is used as-is; otherwise participants are
+ *  shuffled randomly.  Safe to call concurrently — the second caller will
+ *  silently no-op if another request beat it. */
+export async function activateDraft(tournamentId: string, manualOrder?: string[]): Promise<void> {
   // No-op if already activated
   const existing = await prisma.tournamentDraft.findUnique({
     where: { tournamentId },
@@ -37,7 +38,19 @@ export async function activateDraft(tournamentId: string): Promise<void> {
   });
   if (participants.length === 0) throw new Error("NO_PARTICIPANTS");
 
-  const orderUserIds = shuffle(participants.map((p) => p.userId));
+  const participantIds = new Set(participants.map((p) => p.userId));
+
+  let orderUserIds: string[];
+  if (manualOrder && manualOrder.length > 0) {
+    // Validate: must be exactly the same set of participant IDs
+    const valid =
+      manualOrder.length === participantIds.size &&
+      manualOrder.every((id) => participantIds.has(id));
+    if (!valid) throw new Error("INVALID_ORDER");
+    orderUserIds = manualOrder;
+  } else {
+    orderUserIds = shuffle(participants.map((p) => p.userId));
+  }
 
   try {
     await prisma.$transaction([
@@ -56,8 +69,8 @@ export async function activateDraft(tournamentId: string): Promise<void> {
   }
 }
 
-/** Re-randomizes the draft order. Only allowed before any picks are made. */
-export async function resetDraftOrder(tournamentId: string): Promise<void> {
+/** Re-randomizes (or manually sets) the draft order. Only allowed before any picks are made. */
+export async function resetDraftOrder(tournamentId: string, manualOrder?: string[]): Promise<void> {
   const draft = await prisma.tournamentDraft.findUnique({
     where: { tournamentId },
     select: { tournamentId: true },
@@ -68,7 +81,18 @@ export async function resetDraftOrder(tournamentId: string): Promise<void> {
     where: { tournamentId },
     select: { userId: true },
   });
-  const orderUserIds = shuffle(participants.map((p) => p.userId));
+  const participantIds = new Set(participants.map((p) => p.userId));
+
+  let orderUserIds: string[];
+  if (manualOrder && manualOrder.length > 0) {
+    const valid =
+      manualOrder.length === participantIds.size &&
+      manualOrder.every((id) => participantIds.has(id));
+    if (!valid) throw new Error("INVALID_ORDER");
+    orderUserIds = manualOrder;
+  } else {
+    orderUserIds = shuffle(participants.map((p) => p.userId));
+  }
 
   // Atomic check-then-write so a concurrent pick cannot slip in between.
   await prisma.$transaction(async (tx) => {

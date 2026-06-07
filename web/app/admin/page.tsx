@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 
 import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
 import { CopyButton } from "@/components/CopyButton";
+import DraftOrderPicker from "@/components/DraftOrderPicker";
 import { authOptions } from "@/lib/auth";
 import { activateDraft, resetDraftOrder } from "@/lib/draft";
 import { prisma } from "@/lib/prisma";
@@ -155,11 +156,17 @@ export default async function AdminPage({
     await requireAdmin();
     const tournamentId = String(formData.get("tournamentId") ?? "").trim();
     if (!tournamentId) redirect("/admin");
+    const rawOrder = String(formData.get("orderUserIds") ?? "").trim();
+    let manualOrder: string[] | undefined;
+    if (rawOrder) {
+      try { manualOrder = JSON.parse(rawOrder) as string[]; } catch { /* ignore */ }
+    }
     try {
-      await activateDraft(tournamentId);
+      await activateDraft(tournamentId, manualOrder);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg === "NO_PARTICIPANTS") redirect("/admin?error=No+participants+enrolled+yet");
+      if (msg === "INVALID_ORDER") redirect("/admin?error=Invalid+draft+order+submitted");
       redirect("/admin?error=Could+not+start+draft");
     }
     redirect("/admin?msg=Draft+started");
@@ -191,6 +198,26 @@ export default async function AdminPage({
       redirect("/admin?error=Could+not+re-randomize");
     }
     redirect("/admin?msg=Draft+order+re-randomized");
+  }
+
+  async function setDraftOrderAction(formData: FormData) {
+    "use server";
+    await requireAdmin();
+    const tournamentId = String(formData.get("tournamentId") ?? "").trim();
+    if (!tournamentId) redirect("/admin");
+    const rawOrder = String(formData.get("orderUserIds") ?? "").trim();
+    let manualOrder: string[] | undefined;
+    try { manualOrder = JSON.parse(rawOrder) as string[]; } catch { redirect("/admin?error=Invalid+order+data"); }
+    try {
+      await resetDraftOrder(tournamentId, manualOrder);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg === "PICKS_MADE") redirect("/admin?error=Cannot+change+order+after+picks+are+made");
+      if (msg === "NO_DRAFT") redirect("/admin?error=No+draft+record+found");
+      if (msg === "INVALID_ORDER") redirect("/admin?error=Invalid+draft+order+submitted");
+      redirect("/admin?error=Could+not+save+order");
+    }
+    redirect("/admin?msg=Draft+order+saved");
   }
 
   async function resetToUpcomingAction(formData: FormData) {
@@ -426,15 +453,23 @@ export default async function AdminPage({
                       <span className="text-xs text-zinc-400 dark:text-zinc-600">
                         {enrolled.size === 0
                           ? "Enroll players to enable draft"
-                          : `${enrolled.size} player${enrolled.size !== 1 ? "s" : ""} enrolled — ready to draft`}
+                          : `${enrolled.size} player${enrolled.size !== 1 ? "s" : ""} enrolled — set order below`}
                       </span>
                       {enrolled.size >= 1 && (
-                        <form action={startDraftAction}>
-                          <input type="hidden" name="tournamentId" value={t.id} />
-                          <button type="submit" className="h-7 rounded-lg bg-amber-500 px-3 text-xs font-semibold text-white hover:bg-amber-600">
-                            Start Draft Now
-                          </button>
-                        </form>
+                        <div className="w-full mt-2">
+                          <DraftOrderPicker
+                            tournamentId={t.id}
+                            players={enrolledUsers.filter(Boolean).map((u) => ({ id: u!.id, label: u!.name ?? u!.email ?? u!.id }))}
+                            action={startDraftAction}
+                            submitLabel="Start Draft with This Order"
+                          />
+                          <form action={startDraftAction} className="mt-2">
+                            <input type="hidden" name="tournamentId" value={t.id} />
+                            <button type="submit" className="h-7 w-full rounded-lg bg-zinc-200 dark:bg-white/10 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-white/20">
+                              🔀 Randomize &amp; Start Draft
+                            </button>
+                          </form>
+                        </div>
                       )}
                     </>
                   )}
@@ -449,7 +484,7 @@ export default async function AdminPage({
                         Pick {draftRecord.currentPick} of {maxPicks}
                         {pickCount === 0 && " · no picks yet"}
                       </span>
-                      {draftOrderIds.length > 0 && (
+                      {pickCount > 0 && draftOrderIds.length > 0 && (
                         <div className="flex flex-wrap gap-1">
                           {draftOrderIds.map((uid, idx) => {
                             const u = userById.get(uid);
@@ -461,11 +496,24 @@ export default async function AdminPage({
                           })}
                         </div>
                       )}
-                      {pickCount === 0 && (
-                        <form action={resetDraftAction}>
-                          <input type="hidden" name="tournamentId" value={t.id} />
-                          <button type="submit" className={`h-7 ${ghostBtn}`}>Re-randomize</button>
-                        </form>
+                      {pickCount === 0 && draftOrderIds.length > 0 && (
+                        <div className="w-full mt-2">
+                          <DraftOrderPicker
+                            tournamentId={t.id}
+                            players={draftOrderIds.map((uid) => {
+                              const u = userById.get(uid);
+                              return { id: uid, label: u?.name ?? u?.email ?? uid };
+                            })}
+                            action={setDraftOrderAction}
+                            submitLabel="Save Order"
+                          />
+                          <form action={resetDraftAction} className="mt-2">
+                            <input type="hidden" name="tournamentId" value={t.id} />
+                            <button type="submit" className="h-7 w-full rounded-lg bg-zinc-200 dark:bg-white/10 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-white/20">
+                              🔀 Re-randomize
+                            </button>
+                          </form>
+                        </div>
                       )}
                       <form action={setTournamentStatusAction}>
                         <input type="hidden" name="tournamentId" value={t.id} />
