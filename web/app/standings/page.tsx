@@ -34,7 +34,7 @@ export default async function StandingsPage() {
     );
   }
 
-  const [picks, playedMatches, users, adjustments, allDbMatches] = await Promise.all([
+  const [picks, playedMatches, users, adjustments, allDbMatches, participants] = await Promise.all([
     prisma.lineupPick.findMany({
       where: { tournamentId: tournament.id },
       select: { userId: true, teamCode: true },
@@ -53,9 +53,20 @@ export default async function StandingsPage() {
       orderBy: [{ matchDate: "asc" }, { createdAt: "asc" }],
       select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, matchDate: true, venue: true },
     }),
+    prisma.tournamentParticipant.findMany({
+      where: { tournamentId: tournament.id },
+      select: { userId: true, teamName: true },
+    }),
   ]);
 
   const userById = new Map(users.map((u) => [u.id, u]));
+  const teamNameById = new Map(participants.filter((p) => p.teamName).map((p) => [p.userId, p.teamName!]));
+  function displayName(uid: string): string {
+    const raw = teamNameById.has(uid) ? teamNameById.get(uid)! : null;
+    if (raw) return raw.length > 22 ? raw.slice(0, 22).trimEnd() + "…" : raw;
+    const u = userById.get(uid);
+    return u?.name ?? u?.email?.split("@")[0] ?? "?";
+  }
   const playerIds = [...new Set(picks.map((p) => p.userId))].sort();
 
   const teamOwners = new Map<string, string[]>();
@@ -86,7 +97,7 @@ export default async function StandingsPage() {
   function ownerInfo(teamCode: string) {
     const ids = teamOwners.get(teamCode) ?? [];
     return {
-      names: ids.map((id) => { const u = userById.get(id); return u?.name ?? u?.email?.split("@")[0] ?? "?"; }),
+      names: ids.map((id) => displayName(id)),
       colorIdx: ids.length > 0 ? playerIds.indexOf(ids[0]) : null,
     };
   }
@@ -121,7 +132,7 @@ export default async function StandingsPage() {
     const teams = [...(teamsByPlayer.get(r.uid) ?? [])].map((code) => ({
       code, name: TEAMS_BY_CODE.get(code)?.name ?? code,
     }));
-    return { id: r.uid, name: user?.name ?? user?.email ?? r.uid.slice(0, 8), earnings: r.earnings, teams, colorIdx: r.colorIdx };
+    return { id: r.uid, name: displayName(r.uid), earnings: r.earnings, teams, colorIdx: r.colorIdx };
   });
 
   const tvMatchesByStage: Partial<Record<string, TvMatch[]>> = {};

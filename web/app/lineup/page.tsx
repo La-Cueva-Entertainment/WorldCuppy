@@ -52,7 +52,7 @@ export default async function LineupPage() {
     );
   }
 
-  const [myPicks, playedMatches, allPicks, allUsers, upcomingMatches, myAdjustments] = await Promise.all([
+  const [myPicks, playedMatches, allPicks, allUsers, upcomingMatches, myAdjustments, myParticipant] = await Promise.all([
     prisma.lineupPick.findMany({
       where: { tournamentId: tournament.id, userId },
       select: { teamCode: true, pickNumber: true },
@@ -76,7 +76,13 @@ export default async function LineupPage() {
       where: { tournamentId: tournament.id, userId },
       select: { amountCents: true },
     }),
+    prisma.tournamentParticipant.findFirst({
+      where: { tournamentId: tournament.id, userId },
+      select: { teamName: true },
+    }),
   ]);
+
+  const myDisplayName = myParticipant?.teamName ?? session.user.name ?? "You";
 
   const payoutRules = resolvePayoutRules(tournament.payoutRules as Record<string, number> | null);
   const matchResults: MatchResult[] = playedMatches.map((m) => ({
@@ -180,7 +186,7 @@ export default async function LineupPage() {
 
         <div className="between" style={{ flexWrap: "wrap", gap: 10, marginBottom: 6 }}>
           <div>
-            <div className="kicker">{session.user.name ?? "You"} · {tournament.name} {tournament.year}</div>
+            <div className="kicker">{myDisplayName} · {tournament.name} {tournament.year}</div>
             <h1>My Teams</h1>
           </div>
           {tournament.status === "draft" && (

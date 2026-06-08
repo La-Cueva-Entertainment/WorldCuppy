@@ -73,7 +73,7 @@ export default async function DraftPage({
       ? PICK_SECONDS_DEFAULT
       : tournament.pickSeconds ?? null;
 
-  const [draft, allPicks, allUsers] = await Promise.all([
+  const [draft, allPicks, allUsers, participants] = await Promise.all([
     prisma.tournamentDraft.findUnique({
       where: { tournamentId: tournament.id },
       select: { status: true, currentPick: true, orderUserIds: true },
@@ -84,9 +84,20 @@ export default async function DraftPage({
       select: { userId: true, teamCode: true, pickNumber: true, createdAt: true },
     }),
     prisma.user.findMany({ select: { id: true, name: true, email: true } }),
+    prisma.tournamentParticipant.findMany({
+      where: { tournamentId: tournament.id },
+      select: { userId: true, teamName: true },
+    }),
   ]);
 
   const userById = new Map(allUsers.map((u) => [u.id, u]));
+  const teamNameById = new Map(participants.filter((p) => p.teamName).map((p) => [p.userId, p.teamName!]));
+  function displayName(uid: string, fallbackEmail = true): string {
+    const raw = teamNameById.has(uid) ? teamNameById.get(uid)! : null;
+    if (raw) return raw.length > 22 ? raw.slice(0, 22).trimEnd() + "…" : raw;
+    const u = userById.get(uid);
+    return fallbackEmail ? (u?.name ?? u?.email?.split("@")[0] ?? "?") : (u?.name ?? "?");
+  }
   const orderUserIds = (draft?.orderUserIds as string[] | null) ?? [];
 
   const takenTeamCodes = allPicks.map((p) => p.teamCode);
@@ -105,9 +116,8 @@ export default async function DraftPage({
   const takenBy: Record<string, { label: string; colorIndex: number }> = {};
   for (const p of allPicks) {
     const idx = orderUserIds.indexOf(p.userId);
-    const u = userById.get(p.userId);
     takenBy[p.teamCode] = {
-      label: u?.name ?? u?.email ?? "?",
+      label: displayName(p.userId),
       colorIndex: idx >= 0 ? idx : 0,
     };
   }
@@ -226,12 +236,12 @@ export default async function DraftPage({
             return `${proto}://${host}`;
           })();
         await postPickMade({
-          pickerName: picker.name ?? picker.email ?? "?",
+          pickerName: teamNameById.get(uid!) ?? picker.name ?? picker.email ?? "?",
           teamName: team.name,
           teamCode,
           pickNumber: _pickAt + 1,
           totalPicks: _maxPicks,
-          nextPickerName: nextPickerUser ? (nextPickerUser.name ?? nextPickerUser.email ?? "?") : null,
+          nextPickerName: nextPickerUser ? (teamNameById.get(nextPickerId!) ?? nextPickerUser.name ?? nextPickerUser.email ?? "?") : null,
           tournamentName: tournament ? `${tournament.name} ${tournament.year}` : "Draft",
           draftUrl: `${siteBase}/draft`,
           isDraftComplete,
@@ -250,24 +260,18 @@ export default async function DraftPage({
     ? (currentPick % orderUserIds.length) + 1
     : null;
 
-  const currentPickerName = expectedTurnUserId
-    ? (() => {
-        const u = userById.get(expectedTurnUserId);
-        return u?.name ?? u?.email ?? "?";
-      })()
-    : null;
+  const currentPickerName = expectedTurnUserId ? displayName(expectedTurnUserId) : null;
 
   const draftComplete = draft?.status === "complete" || (maxPicks > 0 && currentPick >= maxPicks);
 
   const recentPicks = allPicks.map((p) => {
-    const u = userById.get(p.userId);
     const team = TEAMS_BY_CODE.get(p.teamCode);
     const colorIdx = orderUserIds.indexOf(p.userId);
     return {
       pickNumber: (p.pickNumber ?? 0) + 1,
       teamCode: p.teamCode,
       teamName: team?.name ?? p.teamCode.toUpperCase(),
-      pickerName: u?.name ?? u?.email?.split("@")[0] ?? "?",
+      pickerName: displayName(p.userId),
       colorIdx: colorIdx >= 0 ? colorIdx : 0,
     };
   });
@@ -304,7 +308,7 @@ export default async function DraftPage({
             <div className="who">
               <div className="lbl">● On the clock</div>
               <div className="nm">
-                {canPickNow ? `Your pick, ${userById.get(userId)?.name ?? "you"}` : currentPickerName}
+                {canPickNow ? `Your pick, ${displayName(userId)}` : currentPickerName}
               </div>
               <div className="sub">
                 Round {roundNumber} · Pick {pickInRound} of {orderUserIds.length} · pick a team below
@@ -320,8 +324,7 @@ export default async function DraftPage({
             <aside className="card rail">
               <div className="rail-h">Draft order</div>
               {orderUserIds.map((uid, idx) => {
-                const u = userById.get(uid);
-                const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
+                const name = displayName(uid);
                 const isMe = uid === userId;
                 const isOn = uid === expectedTurnUserId;
                 const picksMade = allPicks.filter((p) => p.userId === uid).length;
@@ -394,8 +397,7 @@ export default async function DraftPage({
                 <aside className="card rail">
                   <div className="rail-h">Draft order</div>
                   {orderUserIds.map((uid, idx) => {
-                    const u = userById.get(uid);
-                    const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
+                    const name = displayName(uid);
                     const isMe = uid === userId;
                     return (
                       <div key={uid} className={`railrow m${idx % 8}`}>
