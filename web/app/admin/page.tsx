@@ -178,15 +178,17 @@ export default async function AdminPage({
       const host = hdrs2.get("host") ?? "localhost:3000";
       const proto = hdrs2.get("x-forwarded-proto") ?? "http";
       const siteBase = process.env.NEXTAUTH_URL?.replace(/\/$/, "") ?? `${proto}://${host}`;
-      const [t, orderedUsers] = await Promise.all([
+      const [t, orderedUsers, draftParticipants] = await Promise.all([
         prisma.tournament.findUnique({ where: { id: tournamentId }, select: { name: true, year: true } }),
         prisma.user.findMany({ where: { id: { in: draftOrder } }, select: { id: true, name: true, email: true } }),
+        prisma.tournamentParticipant.findMany({ where: { tournamentId, userId: { in: draftOrder } }, select: { userId: true, teamName: true } }),
       ]);
       if (t && draftOrder.length > 0) {
         const uMap = new Map(orderedUsers.map((u) => [u.id, u]));
+        const tMap = new Map(draftParticipants.filter((p) => p.teamName).map((p) => [p.userId, p.teamName!]));
         await postDraftStarted({
           tournamentName: `${t.name} ${t.year}`,
-          order: draftOrder.map((id) => { const u = uMap.get(id); return { name: u?.name ?? u?.email ?? "?" }; }),
+          order: draftOrder.map((id) => { const u = uMap.get(id); return { name: tMap.get(id) ?? u?.name ?? u?.email ?? "?" }; }),
           draftUrl: `${siteBase}/draft`,
         });
       }

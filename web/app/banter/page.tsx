@@ -62,13 +62,37 @@ export default async function BanterPage() {
     }),
   ]);
 
+  // Collect all user IDs that need name resolution
+  const allUserIds = [...new Set([
+    ...rawPosts.map((p) => p.authorId),
+    ...rawPosts.flatMap((p) => p.replies.map((r) => r.authorId)),
+    ...onlineUsers.map((u) => u.id),
+    currentUserId,
+  ])];
+
+  // Look up team names from the active tournament (team name shown instead of real name)
+  let teamNameById = new Map<string, string>();
+  if (tournament) {
+    const participants = await prisma.tournamentParticipant.findMany({
+      where: { tournamentId: tournament.id, userId: { in: allUserIds } },
+      select: { userId: true, teamName: true },
+    });
+    teamNameById = new Map(
+      participants.filter((p) => p.teamName).map((p) => [p.userId, p.teamName!])
+    );
+  }
+
+  function dn(userId: string, fallback: string | null | undefined): string {
+    return teamNameById.get(userId) ?? fallback ?? "?";
+  }
+
   // Build stable color map from all unique author IDs (sorted)
   const authorIds = [...new Set(rawPosts.map((p) => p.authorId))].sort();
 
   const posts = rawPosts.map((p) => ({
     id: p.id,
     authorId: p.authorId,
-    authorName: p.author.name,
+    authorName: dn(p.authorId, p.author.name),
     colorIdx: colorIdx(p.authorId, authorIds),
     text: p.text,
     imageUrl: p.imageUrl,
@@ -82,7 +106,7 @@ export default async function BanterPage() {
     replies: p.replies.map((r) => ({
       id: r.id,
       authorId: r.authorId,
-      authorName: r.author.name,
+      authorName: dn(r.authorId, r.author.name),
       colorIdx: colorIdx(r.authorId, authorIds),
       text: r.text,
       createdAt: r.createdAt.toISOString(),
@@ -96,7 +120,7 @@ export default async function BanterPage() {
 
   const onlineUsersMapped = onlineUsers.map((u) => ({
     id: u.id,
-    name: u.name,
+    name: dn(u.id, u.name),
     lastSeenAt: u.lastSeenAt!.toISOString(),
     colorIdx: colorIdx(u.id, authorIds),
     isMe: u.id === currentUserId,
@@ -106,7 +130,7 @@ export default async function BanterPage() {
     <BanterFeed
       initialPosts={posts}
       currentUserId={currentUserId}
-      currentUserName={session.user.name ?? session.user.email?.split("@")[0] ?? "?"}
+      currentUserName={dn(currentUserId, session.user.name ?? session.user.email?.split("@")[0])}
       draftInfo={draftInfo}
       onlineUsers={onlineUsersMapped}
     />
