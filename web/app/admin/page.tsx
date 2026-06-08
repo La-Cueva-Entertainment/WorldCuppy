@@ -335,7 +335,12 @@ export default async function AdminPage({
   return (
     <main className="page">
       <div className="wrap">
-      <h1 className="mb-6 text-3xl font-extrabold text-zinc-900 dark:text-white">Admin Panel</h1>
+      <div className="between" style={{ marginBottom: "24px", flexWrap: "wrap", gap: "10px" }}>
+        <div>
+          <div className="kicker">Site Admin</div>
+          <h1 style={{ marginTop: 4 }}>Admin Panel</h1>
+        </div>
+      </div>
 
       {resolved.msg && (
         <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">

@@ -32,7 +32,11 @@ function fmtTime(iso: string | null | undefined): string | null {
   });
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: { day?: string } | Promise<{ day?: string }>;
+}) {
   const session = await getServerSession(authOptions);
 
   if (!session) {
@@ -114,20 +118,25 @@ export default async function HomePage() {
     select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true, draftDate: true, payoutRules: true },
   });
 
-  // ── Upcoming matches (next scheduled day) ────────────────────────
+  // ── Match day navigation ─────────────────────────────────────────
+  const resolvedSP = searchParams ? await Promise.resolve(searchParams) : {};
+  const requestedDay = (resolvedSP as { day?: string }).day ?? null;
+
   const nowPST = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-  const todayStart = new Date(Date.UTC(nowPST.getFullYear(), nowPST.getMonth(), nowPST.getDate(), 8, 0, 0));
-  const upcomingEnd = new Date(todayStart);
-  upcomingEnd.setDate(upcomingEnd.getDate() + 30);
+  const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(nowPST);
 
   function pstDayStr(date: Date): string {
     return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(date);
   }
+  function fmtDayLabel(dayStr: string): string {
+    const [y, mo, d] = dayStr.split("-").map(Number);
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(y!, (mo ?? 1) - 1, d));
+  }
 
-  const [upcomingAllMatches, allPicks, users, playedMatches, adjustments] = tournament
+  const [allTournamentMatches, allPicks, users, playedMatches, adjustments] = tournament
     ? await Promise.all([
         prisma.match.findMany({
-          where: { tournamentId: tournament.id, matchDate: { gte: todayStart, lte: upcomingEnd } },
+          where: { tournamentId: tournament.id, matchDate: { not: null } },
           orderBy: { matchDate: "asc" },
           select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, matchDate: true, venue: true },
         }),
@@ -147,14 +156,32 @@ export default async function HomePage() {
       ])
     : [[], [], [], [], []];
 
-  // Filter upcoming matches to just the first scheduled day
-  const firstDayStr = upcomingAllMatches[0]?.matchDate ? pstDayStr(upcomingAllMatches[0].matchDate) : null;
-  const upcomingDbMatches = firstDayStr
-    ? upcomingAllMatches.filter((m) => m.matchDate && pstDayStr(m.matchDate) === firstDayStr)
-    : [];
-  const upcomingDayLabel = upcomingAllMatches[0]?.matchDate
-    ? new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric" }).format(upcomingAllMatches[0].matchDate)
-    : null;
+  // Build sorted unique day list from all match dates
+  const allDays = [...new Set(
+    allTournamentMatches
+      .filter((m) => m.matchDate)
+      .map((m) => pstDayStr(m.matchDate as Date))
+  )].sort();
+
+  // Default: first day >= today with at least one unplayed match; fall back to last known day
+  const defaultDay =
+    allDays.find((d) => {
+      if (d < todayStr) return false;
+      return allTournamentMatches.some((m) => m.matchDate && pstDayStr(m.matchDate as Date) === d && !m.played);
+    }) ??
+    allDays.find((d) => d >= todayStr) ??
+    allDays[allDays.length - 1] ??
+    todayStr;
+
+  const selectedDay = requestedDay && allDays.includes(requestedDay) ? requestedDay : defaultDay;
+  const selectedDayIdx = allDays.indexOf(selectedDay);
+  const prevDay = selectedDayIdx > 0 ? (allDays[selectedDayIdx - 1] ?? null) : null;
+  const nextDay = selectedDayIdx < allDays.length - 1 ? (allDays[selectedDayIdx + 1] ?? null) : null;
+
+  const selectedDayMatches = allTournamentMatches.filter(
+    (m) => m.matchDate && pstDayStr(m.matchDate as Date) === selectedDay
+  );
+  const selectedDayLabel = allDays.length > 0 ? fmtDayLabel(selectedDay) : null;
 
   const userById = new Map(users.map((u: { id: string; name: string | null; email: string | null }) => [u.id, u]));
   const playerIds = [...new Set(allPicks.map((p: { userId: string; teamCode: string }) => p.userId))].sort();
@@ -216,8 +243,8 @@ export default async function HomePage() {
               {tournament ? `${tournament.name} ${tournament.year}` : "World Cuppy"}
             </h1>
           </div>
-          {upcomingDbMatches.length > 0 && (
-            <span className="badge hot"><span className="live-dot"></span> {upcomingDbMatches.length} match{upcomingDbMatches.length !== 1 ? "es" : ""}{upcomingDayLabel ? ` · ${upcomingDayLabel}` : ""}</span>
+          {selectedDayMatches.length > 0 && (
+            <span className="badge hot"><span className="live-dot"></span> {selectedDayMatches.length} match{selectedDayMatches.length !== 1 ? "es" : ""}{selectedDayLabel ? ` · ${selectedDayLabel}` : ""}</span>
           )}
           {showLiveSync && <LiveSync />}
         </div>
@@ -296,19 +323,33 @@ export default async function HomePage() {
               </section>
             )}
 
-            {/* Upcoming matches */}
+            {/* Match day */}
             <section>
-              <div className="sec-head">
-                <h2>Upcoming{upcomingDayLabel ? ` — ${upcomingDayLabel}` : " matches"}</h2>
-                <Link href="/standings" className="tag-soft" style={{ fontWeight: 700 }}>Bracket →</Link>
+              <div className="sec-head" style={{ flexWrap: "wrap", gap: "8px" }}>
+                <h2>
+                  {selectedDay < todayStr ? "Results" : selectedDay === todayStr ? "Today" : "Upcoming"}{selectedDayLabel ? ` — ${selectedDayLabel}` : ""}
+                </h2>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                  {prevDay && (
+                    <Link href={`/?day=${prevDay}`} className="tag-soft" style={{ fontWeight: 700, fontSize: "12px" }}>
+                      ← {fmtDayLabel(prevDay)}
+                    </Link>
+                  )}
+                  {nextDay && (
+                    <Link href={`/?day=${nextDay}`} className="tag-soft" style={{ fontWeight: 700, fontSize: "12px" }}>
+                      {fmtDayLabel(nextDay)} →
+                    </Link>
+                  )}
+                  <Link href="/standings" className="tag-soft" style={{ fontWeight: 700 }}>Bracket →</Link>
+                </div>
               </div>
-              {upcomingDbMatches.length === 0 ? (
+              {selectedDayMatches.length === 0 ? (
                 <div className="card card-pad" style={{ textAlign: "center", color: "var(--ink-faint)", fontSize: "14px" }}>
-                  No upcoming matches scheduled.
+                  {allDays.length === 0 ? "No matches scheduled yet." : "No matches on this day."}
                 </div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px" }}>
-                  {upcomingDbMatches.map((m) => {
+                  {selectedDayMatches.map((m) => {
                     const homeWon = m.played && ((m.homeScore ?? 0) > (m.awayScore ?? 0) || m.penaltyWinner === m.homeTeam);
                     const awayWon = m.played && ((m.awayScore ?? 0) > (m.homeScore ?? 0) || m.penaltyWinner === m.awayTeam);
                     const kickoff = fmtTime(m.matchDate?.toISOString());
