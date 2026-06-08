@@ -15,7 +15,7 @@ async function requireUser() {
     const email = session.user.email?.toLowerCase().trim();
     if (email) {
       const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-      userId = user?.id;
+      if (user?.id) userId = user.id;
     }
   }
   if (!userId) throw new Error("User not found");
@@ -105,9 +105,25 @@ export async function getReplies(postId: string) {
     },
   });
 
+  // Build stable color index from sorted author IDs in this reply set
+  const authorIds = [...new Set(replies.map((r) => r.authorId))].sort();
+  function colorIdx(userId: string) {
+    const i = authorIds.indexOf(userId);
+    if (i >= 0) return i % 8;
+    let h = 0;
+    for (let j = 0; j < userId.length; j++) h = (h * 31 + userId.charCodeAt(j)) | 0;
+    return Math.abs(h) % 8;
+  }
+
   return replies.map((r) => ({
-    ...r,
+    id: r.id,
+    postId: r.postId,
+    authorId: r.authorId,
+    authorName: r.author.name,
+    colorIdx: colorIdx(r.authorId),
+    text: r.text,
     createdAt: r.createdAt.toISOString(),
+    reactions: r.reactions,
   }));
 }
 

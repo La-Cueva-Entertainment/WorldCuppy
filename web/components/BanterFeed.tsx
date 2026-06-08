@@ -234,7 +234,7 @@ function ReplyThread({ postId, initialReplies, replyCount, myId, myName, myColor
 
   async function loadAll() {
     const full = await getReplies(postId);
-    setReplies(full as ReplyData[]);
+    setReplies(full as unknown as ReplyData[]);
     setLoaded(true);
   }
 

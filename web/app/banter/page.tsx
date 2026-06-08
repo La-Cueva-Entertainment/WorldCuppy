@@ -23,7 +23,7 @@ export default async function BanterPage() {
     const email = session.user.email?.toLowerCase().trim();
     if (email) {
       const u = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-      currentUserId = u?.id;
+      if (u?.id) currentUserId = u.id;
     }
   }
   if (!currentUserId) redirect("/login");
