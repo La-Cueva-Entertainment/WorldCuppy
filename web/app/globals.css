@@ -545,19 +545,19 @@ html:not(.dark) .pitch-panel {
 .chip-clk { font-size: 12px; font-weight: 700; color: var(--m); margin-left: 4px; }
 
 /* Team table (draft board) — base styles first */
-.teamtbl { width: 100%; min-width: 380px; table-layout: fixed; }
+.teamtbl { width: 100%; min-width: 380px; }
 .teamtbl tr.taken td { opacity: .62; }
 .teamtbl tr.mine { background: color-mix(in srgb, var(--grass) 7%, var(--surface)); }
 .teamtbl tr.mine td { opacity: 1; }
 .teamtbl td.flag-cell { width: 46px; padding: 8px 4px 8px 12px; }
 .teamtbl td.nm-cell { font-weight: 700; font-size: 15px; width: 160px; }
-.teamtbl td.players-col { width: 220px; overflow: hidden; }
+.teamtbl td.players-col { width: 1px; white-space: nowrap; }
 .teamtbl .nm-player { display: none; }
 .teamtbl .nm-tier { display: none; }
 .teamtbl .nm-name-row { display: flex; align-items: center; gap: 7px; }
 .teamtbl td.tier-cell { white-space: nowrap; width: 130px; }
 .player-chip { display: inline-flex; align-items: center; gap: 5px; margin-right: 10px;
-  font-size: 13px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
 .player-chip .pos-dot { font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700;
   font-size: 10px; letter-spacing: .04em; color: var(--ink-faint);
   background: var(--surface-2); border: 1px solid var(--line);
