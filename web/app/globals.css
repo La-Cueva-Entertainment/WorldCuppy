@@ -102,7 +102,7 @@ html.dark .m6{--m:#a890e0} html.dark .m7{--m:#d77fb4}
 
 /* ── Base ───────────────────────────────────────────────── */
 * { box-sizing: border-box; }
-html { scrollbar-gutter: stable; background: var(--paper); }
+html { scrollbar-gutter: stable; background: var(--paper); overflow-x: hidden; }
 body {
   margin: 0;
   font-family: var(--font-hanken), 'Hanken Grotesk', system-ui, sans-serif;
