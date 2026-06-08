@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WorldCuppy — Banter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Hanken+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  /* ---- layout ---- */
+  .banter-grid { display:grid; grid-template-columns: 1fr 300px; gap: 22px; align-items:start; }
+  @media (max-width:920px){ .banter-grid{ grid-template-columns:1fr; } }
+
+  /* ---- composer ---- */
+  .composer {
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);
+    padding:14px 16px; margin-bottom:18px; box-shadow:var(--shadow-sm);
+  }
+  .comp-top { display:flex; gap:12px; align-items:flex-start; }
+  .comp-top textarea {
+    flex:1; border:none; background:transparent; outline:none; resize:none; min-height:44px; max-height:180px;
+    font-family:'Hanken Grotesk'; font-size:15px; color:var(--ink); line-height:1.4;
+    caret-color: var(--grass);
+  }
+  .comp-top textarea::placeholder { color:var(--ink-faint); }
+  .comp-actions { display:flex; gap:8px; align-items:center; padding-top:10px; border-top:1px solid var(--line-soft); margin-top:10px; }
+  .comp-btn {
+    font-family:'Archivo'; font-weight:700; font-size:13px; cursor:pointer; height:34px; padding:0 14px;
+    border-radius:9px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink-soft);
+    display:inline-flex; align-items:center; gap:6px; transition:.12s;
+  }
+  .comp-btn:hover{ border-color:var(--ink-faint); color:var(--ink); }
+  .comp-spacer{ flex:1; }
+
+  /* ---- filter tabs ---- */
+  .feed-tabs { display:flex; gap:4px; margin-bottom:16px; }
+  .feed-tab {
+    font-family:'Archivo'; font-weight:700; font-size:13.5px; cursor:pointer; padding:7px 14px;
+    border-radius:10px; border:none; background:transparent; color:var(--ink-soft); transition:.12s;
+  }
+  .feed-tab:hover{ background:var(--surface-2); color:var(--ink); }
+  .feed-tab.on{ background:var(--surface); border:1px solid var(--line); color:var(--ink); box-shadow:var(--shadow-sm); }
+
+  /* ---- posts ---- */
+  .post {
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);
+    box-shadow:var(--shadow-sm); margin-bottom:14px; overflow:hidden;
+  }
+  .post.system { background:var(--surface-2); border-color:var(--line-soft); }
+  .post-body { padding:14px 16px; }
+  .post-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .post-av {
+    width:36px; height:36px; border-radius:50%; flex:none; background:var(--m); color:#fff;
+    display:grid; place-items:center; font-family:'Archivo'; font-weight:800; font-size:15px;
+    box-shadow:0 0 0 2px var(--surface), 0 0 0 3.5px var(--m);
+  }
+  .post-av.sys { background:var(--surface-2); border:2px solid var(--line); color:var(--ink-faint); font-size:16px; }
+  .post-who { flex:1; min-width:0; }
+  .post-who .nm { font-family:'Archivo'; font-weight:800; font-size:15px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .post-who .ts { font-size:12px; color:var(--ink-faint); }
+  .post-text { font-size:15px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+  .post-text a { color:var(--grass-deep); font-weight:600; text-decoration:underline; text-underline-offset:2px; }
+
+  /* system card */
+  .sys-card {
+    display:flex; align-items:center; gap:12px; padding:12px 16px;
+    border-bottom:1px solid var(--line-soft); font-size:14px;
+  }
+  .sys-icon { font-size:22px; flex:none; }
+  .sys-txt { flex:1; color:var(--ink-soft); }
+  .sys-txt b { color:var(--ink); font-weight:700; }
+  .sys-txt .by { color:var(--m); font-weight:700; }
+
+  /* image placeholder */
+  .post-img {
+    margin:10px 0 4px; border-radius:11px; overflow:hidden; background:var(--surface-2);
+    background-image: repeating-linear-gradient(135deg, var(--line-soft) 0 12px, transparent 12px 24px);
+    height:220px; display:grid; place-items:center; border:1px solid var(--line-soft);
+  }
+  .post-img .ph { font-size:13px; color:var(--ink-faint); background:var(--surface); padding:5px 12px; border-radius:8px; border:1px solid var(--line); }
+
+  /* GIF/media badge */
+  .gif-badge {
+    display:inline-flex; align-items:center; gap:4px; font-family:'Archivo'; font-weight:800;
+    font-size:10px; letter-spacing:.08em; color:var(--ink); background:var(--gold-soft); border:1.5px solid var(--gold);
+    padding:2px 7px; border-radius:5px; margin-top:4px;
+  }
+
+  /* reactions */
+  .reactions { display:flex; align-items:center; gap:6px; padding:10px 16px 0; flex-wrap:wrap; }
+  .rxn {
+    display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 11px;
+    border-radius:999px; border:1.5px solid var(--line); background:var(--surface);
+    font-size:14px; cursor:pointer; transition:.12s; user-select:none;
+  }
+  .rxn:hover { border-color:var(--ink-faint); background:var(--surface-2); transform:scale(1.06); }
+  .rxn.mine { border-color:var(--grass); background:var(--grass-soft); }
+  .rxn .ct { font-family:'Spline Sans Mono'; font-size:12px; font-weight:600; color:var(--ink-soft); }
+  .rxn.mine .ct { color:var(--grass-deep); }
+  .rxn-add {
+    width:30px; height:30px; border-radius:50%; border:1.5px dashed var(--line); background:transparent;
+    display:grid; place-items:center; font-size:15px; cursor:pointer; color:var(--ink-faint);
+    transition:.12s; flex:none;
+  }
+  .rxn-add:hover { border-color:var(--ink-faint); color:var(--ink); background:var(--surface-2); }
+
+  /* emoji picker */
+  .emoji-picker {
+    position:absolute; z-index:40; background:var(--surface); border:1px solid var(--line);
+    border-radius:14px; box-shadow:var(--shadow-lg); padding:10px 12px;
+    display:none; flex-wrap:wrap; gap:4px; width:240px;
+  }
+  .emoji-picker.open { display:flex; }
+  .ep-em { font-size:22px; cursor:pointer; padding:4px; border-radius:8px; transition:.1s; }
+  .ep-em:hover { background:var(--surface-2); transform:scale(1.2); }
+
+  /* post footer */
+  .post-foot { display:flex; align-items:center; gap:4px; padding:9px 16px 12px; position:relative; }
+  .reply-btn {
+    font-family:'Archivo'; font-weight:700; font-size:13px; cursor:pointer; height:30px; padding:0 13px;
+    border-radius:8px; border:none; background:transparent; color:var(--ink-faint); transition:.12s;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .reply-btn:hover { background:var(--surface-2); color:var(--ink); }
+  .post-time { margin-left:auto; font-size:12px; color:var(--ink-faint); }
+
+  /* replies */
+  .replies { border-top:1px solid var(--line-soft); background:var(--surface-2); }
+  .reply {
+    display:flex; gap:10px; padding:11px 16px; border-bottom:1px solid var(--line-soft);
+  }
+  .reply:last-child { border-bottom:0; }
+  .reply-av {
+    width:28px; height:28px; border-radius:50%; flex:none; background:var(--m); color:#fff;
+    display:grid; place-items:center; font-family:'Archivo'; font-weight:800; font-size:12px; margin-top:1px;
+  }
+  .reply-body .nm { font-family:'Archivo'; font-weight:800; font-size:13.5px; display:flex; gap:7px; align-items:center; }
+  .reply-body .txt { font-size:14px; line-height:1.45; margin-top:3px; }
+  .reply-body .ts { font-size:11px; color:var(--ink-faint); }
+  .reply-rxns { display:flex; gap:5px; margin-top:7px; flex-wrap:wrap; }
+  .mini-rxn { font-size:13px; cursor:pointer; padding:3px 8px; border-radius:999px; border:1px solid var(--line-soft); background:var(--surface); transition:.1s; }
+  .mini-rxn:hover { border-color:var(--ink-faint); transform:scale(1.08); }
+  .mini-rxn.mine { border-color:var(--grass); background:var(--grass-soft); }
+
+  /* reply composer */
+  .reply-compose {
+    display:flex; gap:10px; padding:10px 14px; border-top:1px solid var(--line);
+    background:var(--surface); align-items:center;
+  }
+  .reply-input {
+    flex:1; border:1px solid var(--line); border-radius:999px; height:34px; padding:0 14px;
+    font-family:'Hanken Grotesk'; font-size:13.5px; color:var(--ink); background:var(--surface);
+    outline:none; transition:.15s;
+  }
+  .reply-input:focus { border-color:var(--grass); box-shadow:0 0 0 3px var(--grass-soft); }
+  .reply-send {
+    font-family:'Archivo'; font-weight:700; font-size:13px; cursor:pointer; height:34px; padding:0 16px;
+    border-radius:999px; border:none; background:var(--grass); color:#fff; flex:none; transition:.12s;
+  }
+  .reply-send:hover{ background:var(--grass-deep); }
+  .reply-compose .post-av.small { width:28px; height:28px; font-size:12px; }
+
+  /* sidebar */
+  .hot-take { padding:12px 14px; border-bottom:1px solid var(--line-soft); display:flex; gap:10px; align-items:flex-start; }
+  .hot-take:last-child { border-bottom:0; }
+  .ht-em { font-size:22px; flex:none; margin-top:2px; }
+  .ht-txt { font-size:14px; line-height:1.4; }
+  .ht-who { font-size:12px; color:var(--ink-faint); margin-top:3px; }
+  .leag-row { display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--line-soft); }
+  .leag-row:last-child { border-bottom:0; }
+  .leag-row .nm { flex:1; font-weight:700; font-size:14px; }
+  .leag-row .ct { font-size:12px; color:var(--ink-faint); }
+</style>
+</head>
+<body>
+<main class="page" data-screen-label="Banter">
+  <div class="wrap">
+    <div class="between" style="margin-bottom:18px; flex-wrap:wrap; gap:10px">
+      <div>
+        <div class="kicker grass">The group chat, but better</div>
+        <h1 style="font-size:clamp(28px,4vw,38px); margin-top:4px">Banter</h1>
+      </div>
+      <span class="badge hot" style="height:28px; font-size:13px"><span class="live-dot"></span> 3 managers active</span>
+    </div>
+
+    <div class="banter-grid">
+      <div>
+        <!-- composer -->
+        <div class="composer" id="comp">
+          <div class="comp-top">
+            <div class="post-av m0" style="margin-top:2px">N</div>
+            <textarea id="compTxt" placeholder="Drop a hot take… 🔥" rows="2" oninput="autoSize(this)"></textarea>
+          </div>
+          <div class="comp-actions" id="compActions" style="display:none">
+            <button class="comp-btn" onclick="insertEmoji()">😂 Emoji</button>
+            <button class="comp-btn" onclick="openImagePicker()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              Photo / GIF
+            </button>
+            <span class="comp-spacer"></span>
+            <button class="btn btn-primary btn-sm" onclick="submitPost()">Post it</button>
+          </div>
+        </div>
+
+        <!-- tabs -->
+        <div class="feed-tabs">
+          <button class="feed-tab on" data-tab="all">All</button>
+          <button class="feed-tab" data-tab="takes">🔥 Hot takes</button>
+          <button class="feed-tab" data-tab="media">📸 Media</button>
+          <button class="feed-tab" data-tab="picks">⚽ Picks</button>
+        </div>
+
+        <!-- feed -->
+        <div id="feed"></div>
+      </div>
+
+      <!-- sidebar -->
+      <aside class="grid" style="gap:18px; position:sticky; top:80px">
+        <section class="card">
+          <div class="card-pad" style="padding-bottom:6px">
+            <h2 style="font-size:18px; margin-bottom:2px">🏆 Top hot takes</h2>
+            <div class="tag-soft">Most reacted this week</div>
+          </div>
+          <div id="hottakes"></div>
+        </section>
+        <section class="card card-pad">
+          <h2 style="font-size:17px; margin-bottom:10px">Active now</h2>
+          <div id="active"></div>
+        </section>
+        <section class="card card-pad" style="background:var(--gold-soft); border-color:var(--gold)">
+          <div class="row" style="gap:8px; margin-bottom:8px">
+            <span style="font-size:22px">📢</span>
+            <div>
+              <div style="font-family:'Archivo';font-weight:800;font-size:15px">Draft night Friday</div>
+              <div class="tag-soft">Round 4 picks — 8 PM ET</div>
+            </div>
+          </div>
+          <a href="Draft.html" class="btn btn-gold btn-sm btn-block" style="margin-top:4px">Open the draft →</a>
+        </section>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<!-- global emoji picker (shared) -->
+<div class="emoji-picker" id="emojiPicker">
+  <div style="width:100%; font-family:'Archivo'; font-weight:700; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:6px; padding: 0 2px;">Football pool vibes</div>
+  <div id="epEmojis"></div>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script>
+  WCChrome.nav("Banter", { admin: true });
+  const WC = window.WC;
+
+  // ---- emoji set ----
+  const EMOJIS = [
+    "🔥","💀","🫡","👑","😭","⚽","🏆","😤","🤣","💸","😬","🎯","🫣","📉","📈","🪦",
+    "🧊","🐐","🧢","💪","😮","🤬","😴","🎰","👏","🤑","🫠","😈","🙏","👻","💥","⭐",
+    "🏳️","🏴","🤡","🫵","😅","😎","😱","🪄",
+  ];
+
+  document.getElementById("epEmojis").innerHTML = EMOJIS.map(e=>
+    `<span class="ep-em" data-em="${e}">${e}</span>`).join("");
+
+  // ---- mock feed data ----
+  let POSTS = [
+    {
+      id:1, type:"post", mgr:1, ts:"2m",
+      text:"Anthony just took Argentina 👀 guaranteed winner picking himself. classic.",
+      reactions:[{e:"🔥",n:4,me:false},{e:"💀",n:2,me:true},{e:"🤣",n:3,me:false}],
+      replies:[
+        { mgr:3, ts:"1m", txt:"bro you took France first round 💀", rxns:["😭","🔥"] },
+        { mgr:0, ts:"just now", txt:"at least I didn't take Mexico 😂", rxns:["🤣"] },
+      ],
+      open:true,
+    },
+    {
+      id:2, type:"system_pick", mgr:1, team:"ARG", ts:"4m",
+      text:"Anthony drafted Argentina 🇦🇷 — the #1 ranked team goes early.",
+    },
+    {
+      id:3, type:"post", mgr:4, ts:"8m",
+      text:"Brazil is going all the way this year and I will not be taking questions. Prepare your wallets.",
+      reactions:[{e:"🫡",n:6,me:false},{e:"💸",n:1,me:false},{e:"😤",n:4,me:true}],
+      replies:[
+        { mgr:7, ts:"7m", txt:"every year Joe 😭 EVERY. YEAR.", rxns:["😭","🤣"] },
+        { mgr:5, ts:"6m", txt:"and every year they bottle the QF", rxns:["💀","🔥"] },
+        { mgr:4, ts:"5m", txt:"this year is different trust", rxns:["🧢"] },
+      ],
+      open:false,
+    },
+    {
+      id:4, type:"post", mgr:2, ts:"22m",
+      text:"genuinely cannot believe spain is still available in round 3. you guys are sleeping.",
+      img:true,
+      reactions:[{e:"👀",n:5,me:false},{e:"🎯",n:3,me:true}],
+      replies:[],
+      open:false,
+    },
+    {
+      id:5, type:"system_result", home:"ARG", hs:2, away:"USA", as:1, ts:"1h",
+      text:"Argentina 2–1 USA — Nico just earned $8.25 off that result 💸",
+      mgr:0,
+    },
+    {
+      id:6, type:"post", mgr:6, ts:"1h",
+      text:"ok who took Denmark in round 3, be honest. I thought it was a joke pick and now I'm scared it's genius.\n\n(it was Nico wasn't it)",
+      reactions:[{e:"🤣",n:7,me:false},{e:"🐐",n:2,me:false}],
+      replies:[
+        { mgr:0, ts:"58m", txt:"it was me. tier 4 jump payouts are real 🤑", rxns:["💀","🔥","😤"] },
+        { mgr:6, ts:"55m", txt:"I'm going to be sick", rxns:["😭"] },
+      ],
+      open:false,
+    },
+    {
+      id:7, type:"post", mgr:7, ts:"2h",
+      text:"mfw I have Belgium and they drew their group opener 😐",
+      gif:"Belgium draw reaction",
+      reactions:[{e:"😭",n:9,me:false},{e:"🪦",n:5,me:false},{e:"😬",n:3,me:true}],
+      replies:[
+        { mgr:3, ts:"1h 58m", txt:"get rekt spencer", rxns:["💀"] },
+      ],
+      open:false,
+    },
+    {
+      id:8, type:"post", mgr:5, ts:"3h",
+      text:"Croatia sneaks to the final again. screenshotting this.",
+      reactions:[{e:"🧢",n:8,me:true},{e:"🤡",n:6,me:false}],
+      replies:[
+        { mgr:1, ts:"2h", txt:"daniel bro…", rxns:["😭"] },
+        { mgr:4, ts:"2h", txt:"we move", rxns:["🤣"] },
+      ],
+      open:false,
+    },
+  ];
+
+  // ---- render ----
+  let emojiTarget = null;
+
+  function av(mgrIdx, size, sys) {
+    if (sys) return `<div class="post-av sys" style="font-size:${size==='sm'?14:18}px">⚽</div>`;
+    const m = WC.mgr(mgrIdx);
+    const sz = size==='sm'?28:36; const fs = size==='sm'?12:15;
+    return `<div class="post-av m${mgrIdx}" style="width:${sz}px;height:${sz}px;font-size:${fs}px">${WC.initials(m.name)}</div>`;
+  }
+
+  function renderReactions(rxns, postId) {
+    const chips = rxns.map((r,i)=>
+      `<button class="rxn ${r.me?'mine':''}" data-post="${postId}" data-ri="${i}" onclick="toggleRxn(${postId},${i})">
+        <span>${r.e}</span><span class="ct">${r.n}</span>
+      </button>`).join('');
+    return chips + `<button class="rxn-add" data-post="${postId}" onclick="openPicker(event,${postId})" title="Add reaction">＋</button>`;
+  }
+
+  function renderReplies(post) {
+    if (!post.replies || !post.replies.length) return '';
+    const items = post.replies.map(r=>`
+      <div class="reply">
+        ${av(r.mgr,'sm',false)}
+        <div class="reply-body">
+          <div class="nm"><span class="m${r.mgr}" style="font-family:'Archivo';font-weight:800">${WC.mgr(r.mgr).name}</span><span class="ts">${r.ts}</span></div>
+          <div class="txt">${r.txt}</div>
+          <div class="reply-rxns">${(r.rxns||[]).map(e=>`<button class="mini-rxn" title="${e}">${e}</button>`).join('')}</div>
+        </div>
+      </div>`).join('');
+    const form = `<div class="reply-compose">
+      ${av(0,'sm',false)}
+      <input class="reply-input" placeholder="Reply to the thread…" />
+      <button class="reply-send">Send</button>
+    </div>`;
+    return `<div class="replies">${items}${form}</div>`;
+  }
+
+  function renderPost(p) {
+    if (p.type === "system_pick") {
+      return `<div class="post system" data-id="${p.id}">
+        <div class="sys-card">
+          <span class="sys-icon">⚽</span>
+          <span class="sys-txt"><span class="by m${p.mgr}">${WC.mgr(p.mgr).name}</span> drafted ${WC.flag(p.team,'md')} <b>${WC.TEAM[p.team].name}</b></span>
+          <span class="tag-soft">${p.ts}</span>
+        </div>
+      </div>`;
+    }
+    if (p.type === "system_result") {
+      const earnMgr = WC.ownerOf(p.home) !== null ? WC.ownerOf(p.home) : WC.ownerOf(p.away);
+      return `<div class="post system" data-id="${p.id}">
+        <div class="sys-card">
+          <span class="sys-icon">🏟️</span>
+          <span class="sys-txt">
+            ${WC.flag(p.home,'sm')} <b>${WC.TEAM[p.home].name} ${p.hs}–${p.as} ${WC.TEAM[p.away].name}</b> ${WC.flag(p.away,'sm')}
+            <span class="muted"> · ${p.text.split('—')[1]?.trim() || ''}</span>
+          </span>
+          <span class="tag-soft">${p.ts}</span>
+        </div>
+      </div>`;
+    }
+
+    const m = WC.mgr(p.mgr);
+    const hasImg = p.img;
+    const hasGif = p.gif;
+    const isOpen = p.open;
+
+    return `<div class="post" data-id="${p.id}">
+      <div class="post-body">
+        <div class="post-head">
+          ${av(p.mgr,'lg',false)}
+          <div class="post-who">
+            <div class="nm"><span>${m.name}</span><span class="m-chip m${p.mgr}" style="height:22px;font-size:11.5px"><span class="mdot"></span>${m.name}</span></div>
+            <div class="ts">${p.ts} ago</div>
+          </div>
+        </div>
+        <div class="post-text">${p.text}</div>
+        ${hasImg ? `<div class="post-img"><span class="ph">📸 drag & drop a photo or meme</span></div>` : ''}
+        ${hasGif ? `<div class="post-img" style="height:160px"><span class="ph">🎬 GIF: ${p.gif}</span></div><div class="gif-badge">GIF</div>` : ''}
+      </div>
+      <div class="reactions">${renderReactions(p.reactions||[], p.id)}</div>
+      <div class="post-foot">
+        <button class="reply-btn" onclick="toggleReplies(${p.id})">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          ${p.replies && p.replies.length ? p.replies.length + ' repl' + (p.replies.length===1?'y':'ies') : 'Reply'}
+        </button>
+        <span class="post-time">${p.ts} ago</span>
+      </div>
+      <div id="rep-${p.id}">${isOpen ? renderReplies(p) : ''}</div>
+    </div>`;
+  }
+
+  function renderFeed(filter) {
+    let posts = POSTS;
+    if (filter==='takes') posts = POSTS.filter(p=>p.type==='post');
+    else if (filter==='media') posts = POSTS.filter(p=>p.img||p.gif);
+    else if (filter==='picks') posts = POSTS.filter(p=>p.type==='system_pick'||p.type==='system_result');
+    document.getElementById('feed').innerHTML = posts.map(renderPost).join('');
+  }
+
+  // ---- interactions ----
+  function toggleReplies(id) {
+    const p = POSTS.find(x=>x.id===id); if(!p) return;
+    p.open = !p.open;
+    document.querySelector(`#rep-${id}`).innerHTML = p.open ? renderReplies(p) : '';
+    // update button label
+    const foot = document.querySelector(`[data-id="${id}"] .reply-btn`);
+    if(foot) foot.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${p.replies&&p.replies.length ? p.replies.length+' repl'+(p.replies.length===1?'y':'ies'):'Reply'}`;
+  }
+
+  function toggleRxn(postId, ri) {
+    const p = POSTS.find(x=>x.id===postId); if(!p) return;
+    const r = p.reactions[ri];
+    r.me = !r.me; r.n += r.me ? 1 : -1;
+    const el = document.querySelector(`[data-post="${postId}"][data-ri="${ri}"]`);
+    if(el){ el.classList.toggle('mine', r.me); el.querySelector('.ct').textContent = r.n; }
+  }
+
+  let pickerPostId = null;
+  function openPicker(e, postId) {
+    e.stopPropagation();
+    const picker = document.getElementById('emojiPicker');
+    pickerPostId = postId;
+    const btn = e.currentTarget;
+    const rect = btn.getBoundingClientRect();
+    picker.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+    picker.style.left = Math.min(rect.left, window.innerWidth - 256) + 'px';
+    picker.classList.toggle('open');
+  }
+  document.addEventListener('click', e=>{
+    if(!e.target.closest('.emoji-picker') && !e.target.closest('.rxn-add'))
+      document.getElementById('emojiPicker').classList.remove('open');
+  });
+  document.getElementById('emojiPicker').addEventListener('click', e=>{
+    const em = e.target.closest('[data-em]'); if(!em||!pickerPostId) return;
+    const emoji = em.dataset.em;
+    const p = POSTS.find(x=>x.id===pickerPostId); if(!p) return;
+    const existing = p.reactions.find(r=>r.e===emoji);
+    if(existing){ existing.n++; existing.me=true; }
+    else p.reactions.push({e:emoji,n:1,me:true});
+    document.querySelector(`[data-id="${pickerPostId}"] .reactions`).innerHTML = renderReactions(p.reactions, pickerPostId);
+    document.getElementById('emojiPicker').classList.remove('open');
+  });
+
+  // tabs
+  document.querySelectorAll('.feed-tab').forEach(t=>t.addEventListener('click',()=>{
+    document.querySelectorAll('.feed-tab').forEach(x=>x.classList.toggle('on',x===t));
+    renderFeed(t.dataset.tab);
+  }));
+
+  // composer expand
+  document.getElementById('compTxt').addEventListener('focus',()=>document.getElementById('compActions').style.display='flex');
+  function autoSize(ta){ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; }
+
+  function submitPost() {
+    const txt = document.getElementById('compTxt').value.trim(); if(!txt) return;
+    POSTS.unshift({ id: Date.now(), type:'post', mgr:0, ts:'just now', text:txt, reactions:[], replies:[], open:false });
+    document.getElementById('compTxt').value='';
+    document.getElementById('compTxt').style.height='auto';
+    document.getElementById('compActions').style.display='none';
+    const activeTab = document.querySelector('.feed-tab.on')?.dataset.tab || 'all';
+    renderFeed(activeTab);
+  }
+  function insertEmoji(){ document.getElementById('compTxt').value += '😂'; document.getElementById('compTxt').focus(); }
+  function openImagePicker(){ alert('In the real app this opens a file picker / GIPHY embed.'); }
+
+  // sidebar hot takes
+  const HOT = [
+    { e:"🔥", txt:'"Morocco is going to QF and I said what I said."', who:"Daniel · 42 rxns" },
+    { e:"🐐", txt:'"Nico wins every tournament. Rigged. Investigate."', who:"Spencer · 38 rxns" },
+    { e:"🪦", txt:'"Belgium 0–0 Croatia. Both teams tried to lose."', who:"Donny · 31 rxns" },
+  ];
+  document.getElementById('hottakes').innerHTML = HOT.map(h=>`
+    <div class="hot-take"><span class="ht-em">${h.e}</span>
+    <div><div class="ht-txt">${h.txt}</div><div class="ht-who">${h.who}</div></div></div>`).join('');
+
+  // active managers
+  const ACTIVE = [
+    {mgr:1,ct:"posted 2m ago"},{mgr:4,ct:"posted 8m ago"},{mgr:0,ct:"you — now"},{mgr:7,ct:"reacted 22m ago"},
+  ];
+  document.getElementById('active').innerHTML = ACTIVE.map(a=>`
+    <div class="leag-row">
+      <div class="post-av m${a.mgr}" style="width:28px;height:28px;font-size:12px">${WC.initials(WC.mgr(a.mgr).name)}</div>
+      <span class="nm">${WC.mgr(a.mgr).name}${WC.mgr(a.mgr).you?' <span class="tag-soft">(you)</span>':''}</span>
+      <span class="ct">${a.ct}</span>
+    </div>`).join('');
+
+  renderFeed('all');
+</script>
+</body>
+</html>

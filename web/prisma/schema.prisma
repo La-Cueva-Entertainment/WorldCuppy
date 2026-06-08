@@ -24,6 +24,10 @@ model User {
   lineupPicks          LineupPick[]
   earningsAdjustments  EarningsAdjustment[]
   tournamentEntries    TournamentParticipant[]
+  banterPosts          BanterPost[]
+  banterReactions      BanterReaction[]
+  banterReplies        BanterReply[]
+  banterReplyReactions BanterReplyReaction[]
 }
 
 model Tournament {
@@ -44,6 +48,7 @@ model Tournament {
   matches      Match[]
   adjustments  EarningsAdjustment[]
   participants TournamentParticipant[]
+  banterPosts  BanterPost[]
 }
 
 model TournamentDraft {
@@ -171,6 +176,65 @@ model TeamPoints {
   updatedAt DateTime @updatedAt
 
   @@index([points])
+}
+
+// ── Banter social feed ────────────────────────────────────────
+
+model BanterPost {
+  id           String    @id @default(cuid())
+  tournamentId String?
+  tournament   Tournament? @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+  authorId     String
+  author       User      @relation(fields: [authorId], references: [id])
+  text         String
+  imageUrl     String?
+  gifUrl       String?
+  isSystem     Boolean   @default(false)
+  systemType   String?   // "pick" | "result"
+  systemData   Json?
+  createdAt    DateTime  @default(now())
+  reactions    BanterReaction[]
+  replies      BanterReply[]
+
+  @@index([tournamentId])
+  @@index([createdAt])
+}
+
+model BanterReaction {
+  id     String     @id @default(cuid())
+  postId String
+  post   BanterPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User       @relation(fields: [userId], references: [id])
+  emoji  String
+
+  @@unique([postId, userId, emoji])
+  @@index([postId])
+}
+
+model BanterReply {
+  id        String     @id @default(cuid())
+  postId    String
+  post      BanterPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User       @relation(fields: [authorId], references: [id])
+  text      String
+  createdAt DateTime   @default(now())
+  reactions BanterReplyReaction[]
+
+  @@index([postId])
+}
+
+model BanterReplyReaction {
+  id      String      @id @default(cuid())
+  replyId String
+  reply   BanterReply @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User        @relation(fields: [userId], references: [id])
+  emoji   String
+
+  @@unique([replyId, userId, emoji])
+  @@index([replyId])
 }
 
 model TeamStagePoints {

@@ -14,8 +14,8 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       // Tailwind / global CSS inline styles
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      // Google Fonts, flag-icons CDN, Fox Sports images, flagcdn
-      "img-src 'self' data: blob: https://flagcdn.com https://media.foxsports.com https://images.foxsports.com https://images2.minutemediacdn.com https://a.espncdn.com https://ichef.bbci.co.uk",
+      // Allow any HTTPS image — news feed images come from unpredictable CDNs
+      "img-src 'self' data: blob: https:",
       "font-src 'self' https://fonts.gstatic.com",
       // Fox Sports RSS, football-data.org API, Discord webhook
       "connect-src 'self' https://api.foxsports.com https://api.football-data.org https://discord.com",

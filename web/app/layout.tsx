@@ -162,6 +162,7 @@ export default async function RootLayout({
                 <NavLink href="/standings">Standings</NavLink>
                 <NavLink href="/draft">Draft</NavLink>
                 <NavLink href="/lineup">My Teams</NavLink>
+                <NavLink href="/banter">Banter</NavLink>
                 <NavLink href="/news">News</NavLink>
                 {(isAdmin || siteOwner) && (
                   <NavLink href="/admin" className="adm">Admin</NavLink>

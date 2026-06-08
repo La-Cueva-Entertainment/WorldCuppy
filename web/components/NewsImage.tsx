@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function NewsImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState(false);
+
+  // Reset state whenever the src URL changes so stale error/visibility
+  // doesn't carry over when the RSS feed re-fetches and returns new URLs.
+  useEffect(() => {
+    setVisible(false);
+    setError(false);
+  }, [src]);
 
   if (error) return null;
 
