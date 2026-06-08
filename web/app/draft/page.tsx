@@ -426,7 +426,7 @@ export default async function DraftPage({
 
   return (
     <main className="page">
-      <div className="wrap" style={{ maxWidth: 920 }}>
+      <div className="wrap">
 
       {/* ── Page header ─────────────────────────────── */}
       <div className="between" style={{ flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>

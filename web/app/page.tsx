@@ -133,7 +133,7 @@ export default async function HomePage({
     return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(y!, (mo ?? 1) - 1, d));
   }
 
-  const [allTournamentMatches, allPicks, users, playedMatches, adjustments] = tournament
+  const [allTournamentMatches, allPicks, users, playedMatches, adjustments, participants] = tournament
     ? await Promise.all([
         prisma.match.findMany({
           where: { tournamentId: tournament.id, matchDate: { not: null } },
@@ -153,8 +153,12 @@ export default async function HomePage({
           where: { tournamentId: tournament.id },
           select: { userId: true, amountCents: true },
         }),
+        prisma.tournamentParticipant.findMany({
+          where: { tournamentId: tournament.id },
+          select: { userId: true, teamName: true },
+        }),
       ])
-    : [[], [], [], [], []];
+    : [[], [], [], [], [], []];
 
   // Build sorted unique day list from all match dates
   const allDays = [...new Set(
@@ -184,6 +188,20 @@ export default async function HomePage({
   const selectedDayLabel = allDays.length > 0 ? fmtDayLabel(selectedDay) : null;
 
   const userById = new Map(users.map((u: { id: string; name: string | null; email: string | null }) => [u.id, u]));
+  const teamNameById = new Map(
+    (participants as { userId: string; teamName: string | null }[])
+      .filter((p) => p.teamName)
+      .map((p) => [p.userId, p.teamName!])
+  );
+
+  function shortRealName(uid: string): string | null {
+    const u = userById.get(uid);
+    const full = u?.name ?? u?.email?.split("@")[0];
+    if (!full) return null;
+    const parts = full.trim().split(/\s+/);
+    return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
+  }
+
   const playerIds = [...new Set(allPicks.map((p: { userId: string; teamCode: string }) => p.userId))].sort();
   const teamsByPlayer = new Map<string, Set<string>>();
   for (const p of allPicks) {
@@ -214,8 +232,10 @@ export default async function HomePage({
         ? totalEarningsCents(matchResults, teams, payoutRules) + (adjByUser.get(uid) ?? 0)
         : (adjByUser.get(uid) ?? 0);
       const u = userById.get(uid);
-      const displayName = u?.name ?? u?.email?.split("@")[0] ?? "?";
-      return { uid, displayName, cents };
+      const teamName = teamNameById.get(uid) ?? null;
+      const displayName = teamName ?? u?.name ?? u?.email?.split("@")[0] ?? "?";
+      const realSub = teamName ? shortRealName(uid) : null;
+      return { uid, displayName, realSub, cents };
     })
     .sort((a, b) => b.cents - a.cents);
 
@@ -411,27 +431,29 @@ export default async function HomePage({
               )}
             </section>
 
-            {/* Mini leaderboard */}
+            {/* Leaderboard */}
             {standings.length > 0 && (
               <section className="card card-pad">
                 <div className="sec-head" style={{ marginBottom: "6px" }}>
                   <h2 style={{ fontSize: "20px" }}>Leaderboard</h2>
-                  <Link href="/standings" className="tag-soft" style={{ fontWeight: 700 }}>See all →</Link>
                 </div>
                 <div>
-                  {standings.slice(0, 5).map((s, i) => (
+                  {standings.map((s, i) => (
                     <div key={s.uid} style={{
                       display: "flex", alignItems: "center", gap: "12px",
-                      padding: "9px 4px", borderBottom: i < 4 ? "1px solid var(--line-soft)" : "0",
+                      padding: "9px 4px", borderBottom: i < standings.length - 1 ? "1px solid var(--line-soft)" : "0",
                       borderRadius: "10px",
                       background: s.uid === userId ? "var(--grass-soft)" : "transparent",
                       paddingInline: s.uid === userId ? "10px" : "4px",
                     }}>
-                      <span style={{ width: "22px", fontFamily: "var(--font-archivo), Archivo, sans-serif", fontWeight: 800, color: "var(--ink-faint)", textAlign: "center" }}>{i + 1}</span>
-                      <span className={`mdot m${colorOf(s.uid)}`}></span>
-                      <span style={{ fontWeight: 700, flex: 1 }}>
-                        {s.displayName}
-                        {s.uid === userId && <span className="faint" style={{ fontSize: "12px", fontWeight: 400 }}> (you)</span>}
+                      <span style={{ width: "22px", fontFamily: "var(--font-archivo), Archivo, sans-serif", fontWeight: 800, color: "var(--ink-faint)", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
+                      <span className={`mdot m${colorOf(s.uid)}`} style={{ flexShrink: 0 }}></span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontWeight: 700, display: "block" }}>
+                          {s.displayName}
+                          {s.uid === userId && <span className="faint" style={{ fontSize: "12px", fontWeight: 400 }}> (you)</span>}
+                        </span>
+                        {s.realSub && <span style={{ fontSize: "11px", color: "var(--ink-faint)", fontWeight: 400 }}>{s.realSub}</span>}
                       </span>
                       <span className="money pos">{formatDollars(s.cents)}</span>
                     </div>

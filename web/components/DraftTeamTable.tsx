@@ -143,12 +143,14 @@ export default function DraftTeamTable({
                     })()}
                   </td>
                   <td className="players-col hide-sm">
-                    {(TEAM_PLAYERS[tm.code] ?? []).slice(0, 2).map((p) => (
-                      <span key={p.name} className="player-chip">
-                        <span className="pos-dot pos-{p.position.toLowerCase()}">{p.position}</span>
-                        {p.name}
-                      </span>
-                    ))}
+                    <div style={{ maxWidth: 190, overflow: "hidden" }}>
+                      {(TEAM_PLAYERS[tm.code] ?? []).slice(0, 2).map((p) => (
+                        <span key={p.name} className="player-chip">
+                          <span className="pos-dot pos-{p.position.toLowerCase()}">{p.position}</span>
+                          {p.name}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="tier-cell">
                     <span className={`tier tier-${tm.tierNum}`}>{tm.tierLabel}</span>
