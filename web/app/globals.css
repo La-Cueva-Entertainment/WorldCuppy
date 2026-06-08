@@ -501,11 +501,26 @@ html:not(.dark) .pitch-panel {
   background: var(--surface); color: var(--ink-faint);
 }
 
-/* ── Draft order strip (horizontal scrollable chips) ──────── */
+/* ── Draft grid (aside | board) ─────────────────────── */
+.draft-grid { display: grid; grid-template-columns: 260px 1fr; gap: 22px; align-items: start; }
+
+/* Rail panel (left aside) */
+.rail-panel { position: sticky; top: 78px; padding: 6px; }
+.rail-h { font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700; font-size: 11px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 6px 10px 4px; }
+
+/* Strip inside aside — vertical list on desktop */
+.rail-panel .order-strip {
+  flex-direction: column; overflow-x: visible; overflow-y: visible;
+  margin-bottom: 0; padding: 4px; background: none; border: none;
+}
+.rail-panel .order-chip { white-space: normal; border-radius: 11px; }
+
+/* ── Draft order strip ─────────────────────────────────────── */
 .order-strip {
-  display: flex; gap: 6px; overflow-x: auto; padding: 10px 12px;
-  scrollbar-width: none; background: var(--surface); border-radius: var(--r);
-  border: 1px solid var(--line); margin-bottom: 14px;
+  display: flex; gap: 6px; overflow-x: visible; padding: 4px;
+  scrollbar-width: none; flex-direction: column;
 }
 .order-strip::-webkit-scrollbar { display: none; }
 .order-chip {
@@ -557,7 +572,14 @@ html:not(.dark) .pitch-panel {
 
 /* ── Draft responsive overrides (all media queries AFTER base) ── */
 @media (max-width: 900px) {
-  /* strip already full-width; no extra rules needed */
+  /* Grid collapses; aside moves above board; strip goes horizontal */
+  .draft-grid { display: block; }
+  .rail-panel { position: static; margin-bottom: 14px; }
+  .rail-panel .order-strip {
+    flex-direction: row; overflow-x: auto; overflow-y: visible;
+    padding: 10px 12px; background: none; border: none; margin-bottom: 0;
+  }
+  .rail-panel .order-chip { white-space: nowrap; border-radius: 20px; }
 }
 
 @media (max-width: 680px) {

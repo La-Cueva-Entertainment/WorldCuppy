@@ -327,21 +327,25 @@ export default async function DraftPage({
             <DraftPickTimer seconds={PICK_SECONDS} key={currentPick} />
           </div>
 
-          {/* ── Draft order strip ───────────────────── */}
-          <DraftOrderStrip
-            participants={orderUserIds.map((uid, idx) => ({
-              userId: uid,
-              name: displayName(uid),
-              real: shortRealName(uid),
-              colorIndex: idx,
-            }))}
-            activeUserId={expectedTurnUserId}
-            currentUserId={userId}
-          />
+          {/* ── Draft grid: aside (order) | board ─── */}
+          <div className="draft-grid">
+            <aside className="card rail-panel">
+              <div className="rail-h">Draft order</div>
+              <DraftOrderStrip
+                participants={orderUserIds.map((uid, idx) => ({
+                  userId: uid,
+                  name: displayName(uid),
+                  real: shortRealName(uid),
+                  colorIndex: idx,
+                }))}
+                activeUserId={expectedTurnUserId}
+                currentUserId={userId}
+              />
+            </aside>
 
-          {/* ── Team picker board ─────────────────────── */}
-          <div>
-            <DraftTeamTable
+            {/* Right: team picker board */}
+            <div>
+              <DraftTeamTable
                 tiers={tiers}
                 takenTeamCodes={takenTeamCodes}
                 myTeamCodes={myTeamCodes}
@@ -355,6 +359,7 @@ export default async function DraftPage({
                 initialTierKey={resolved.tier}
                 recentPicks={recentPicks}
               />
+            </div>
           </div>
         </>
       ) : (
@@ -380,18 +385,21 @@ export default async function DraftPage({
 
           {/* Draft order strip + team table */}
           {!draftComplete && (
-            <>
+            <div className="draft-grid">
               {orderUserIds.length > 0 && (
-                <DraftOrderStrip
-                  participants={orderUserIds.map((uid, idx) => ({
-                    userId: uid,
-                    name: displayName(uid),
-                    real: shortRealName(uid),
-                    colorIndex: idx,
-                  }))}
-                  activeUserId={null}
-                  currentUserId={userId}
-                />
+                <aside className="card rail-panel">
+                  <div className="rail-h">Draft order</div>
+                  <DraftOrderStrip
+                    participants={orderUserIds.map((uid, idx) => ({
+                      userId: uid,
+                      name: displayName(uid),
+                      real: shortRealName(uid),
+                      colorIndex: idx,
+                    }))}
+                    activeUserId={null}
+                    currentUserId={userId}
+                  />
+                </aside>
               )}
               <DraftTeamTable
                 tiers={tiers}
@@ -406,7 +414,7 @@ export default async function DraftPage({
                 initialTierKey={resolved.tier}
                 recentPicks={recentPicks}
               />
-            </>
+            </div>
           )}
         </>
       )}
