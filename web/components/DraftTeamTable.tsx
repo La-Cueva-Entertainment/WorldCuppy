@@ -112,12 +112,12 @@ export default function DraftTeamTable({
         <table className="tbl teamtbl">
           <thead>
             <tr>
-              <th style={{ width: 46 }}>Flag</th>
-              <th>Team</th>
+              <th style={{ width: 44 }}>Flag</th>
+              <th style={{ width: 155 }}>Team</th>
               <th className="players-col hide-sm">Key players</th>
-              <th>Tier &middot; payout</th>
-              <th className="r rk" style={{ width: 54 }}>FIFA</th>
-              {canDraft && <th className="r act">Pick</th>}
+              <th style={{ width: 145 }}>Tier &middot; payout</th>
+              <th className="r rk" style={{ width: 56 }}>FIFA</th>
+              {canDraft && <th className="r act" style={{ width: 120 }}>Pick</th>}
             </tr>
           </thead>
           <tbody>
