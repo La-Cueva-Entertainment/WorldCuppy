@@ -551,7 +551,7 @@ html:not(.dark) .pitch-panel {
 .teamtbl tr.mine td { opacity: 1; }
 .teamtbl td.flag-cell { width: 46px; padding: 8px 4px 8px 12px; }
 .teamtbl td.nm-cell { font-weight: 700; font-size: 15px; width: 160px; }
-.teamtbl td.players-col { width: auto; }
+.teamtbl td.players-col { width: auto; max-width: 320px; overflow: hidden; }
 .teamtbl .nm-player { display: none; }
 .teamtbl .nm-tier { display: none; }
 .teamtbl .nm-name-row { display: flex; align-items: center; gap: 7px; }
