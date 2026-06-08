@@ -551,6 +551,9 @@ html:not(.dark) .pitch-panel {
 .teamtbl td.flag-cell { width: 46px; padding: 8px 4px 8px 12px; }
 .teamtbl td.nm-cell { font-weight: 700; font-size: 15px; width: 160px; }
 .teamtbl td.players-col { width: auto; }
+.teamtbl .nm-player { display: none; }
+.teamtbl .nm-tier { display: none; }
+.teamtbl .nm-name-row { display: flex; align-items: center; gap: 7px; }
 .teamtbl td.tier-cell { white-space: nowrap; width: 130px; }
 .player-chip { display: inline-flex; align-items: center; gap: 5px; margin-right: 10px;
   font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
@@ -569,6 +572,12 @@ html:not(.dark) .pitch-panel {
 }
 .draftbtn:hover { background: var(--grass-deep); }
 .draftbtn:disabled { opacity: .4; cursor: not-allowed; filter: none; }
+.avail-btn {
+  font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700; font-size: 12px;
+  display: inline-flex; align-items: center; height: 32px; padding: 0 14px;
+  border-radius: 9px; border: 1.5px solid var(--line);
+  color: var(--ink-faint); background: transparent; white-space: nowrap; letter-spacing: .02em;
+}
 
 /* ── Draft responsive overrides (all media queries AFTER base) ── */
 @media (max-width: 900px) {
@@ -603,13 +612,16 @@ html:not(.dark) .pitch-panel {
   .teamtbl tbody tr + tr { border-top: 1px solid var(--line); }
   .teamtbl td { display: block; padding: 0; border: 0; }
   .teamtbl td.flag-cell { width: 34px; flex: none; }
-  .teamtbl td.nm-cell { flex: 1; min-width: 0; font-size: 14px; }
+  .teamtbl td.nm-cell { flex: 1; min-width: 0; width: auto; font-size: 14px; }
+  .teamtbl .nm-player { display: block; font-size: 11px; font-weight: 400; color: var(--ink-faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .teamtbl .nm-tier { display: inline-flex; font-size: 11px; padding: 1px 6px; }
   .teamtbl td.tier-cell { display: none !important; }
   .teamtbl td.rk { display: none; }
   .teamtbl td.act { flex: none; text-align: right; width: auto; }
   .teamtbl tr.mine { background: color-mix(in srgb, var(--grass) 7%, var(--surface)) !important; }
   .teamtbl tr.mine td { opacity: 1 !important; }
   .draftbtn { height: 38px; min-width: 68px; font-size: 14px; padding: 0 14px; }
+  .avail-btn { height: 38px; font-size: 13px; padding: 0 14px; }
 }
 
 /* Jump-tier legend */

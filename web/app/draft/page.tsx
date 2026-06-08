@@ -408,6 +408,7 @@ export default async function DraftPage({
                 takenBy={takenBy}
                 canDraft={false}
                 canPickNow={false}
+                showAvailable={true}
                 picksCount={myPicks.length}
                 lineupSize={LINEUP_SIZE}
                 draftTeamAction={draftTeamAction}

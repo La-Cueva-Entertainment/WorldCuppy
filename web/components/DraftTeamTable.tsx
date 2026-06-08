@@ -29,6 +29,7 @@ interface Props {
   takenBy: Record<string, { label: string; colorIndex: number }>;
   canDraft: boolean;
   canPickNow: boolean;
+  showAvailable?: boolean;
   picksCount: number;
   lineupSize: number;
   draftTeamAction: (formData: FormData) => Promise<void>;
@@ -44,6 +45,7 @@ export default function DraftTeamTable({
   takenBy,
   canDraft,
   canPickNow,
+  showAvailable,
   picksCount,
   lineupSize,
   draftTeamAction,
@@ -128,7 +130,18 @@ export default function DraftTeamTable({
                   <td className="flag-cell">
                     <CountryFlag code={tm.code} label={tm.name} className="flag-lg fi-rect" />
                   </td>
-                  <td className="nm-cell">{tm.name}</td>
+                  <td className="nm-cell">
+                    <span className="nm-name-row">
+                      {tm.name}
+                      <span className={`tier tier-${tm.tierNum} nm-tier`}>{tm.tierLabel}</span>
+                    </span>
+                    {(() => {
+                      const players = (TEAM_PLAYERS[tm.code] ?? []).slice(0, 2);
+                      return players.length > 0 ? (
+                        <span className="nm-player">{players.map(p => p.name).join(" · ")}</span>
+                      ) : null;
+                    })()}
+                  </td>
                   <td className="players-col hide-sm">
                     {(TEAM_PLAYERS[tm.code] ?? []).slice(0, 2).map((p) => (
                       <span key={p.name} className="player-chip">
@@ -141,7 +154,7 @@ export default function DraftTeamTable({
                     <span className={`tier tier-${tm.tierNum}`}>{tm.tierLabel}</span>
                   </td>
                   <td className="r rk">#{tm.rank}</td>
-                  {canDraft && (
+                  {(canDraft || showAvailable) && (
                     <td className="act">
                       {taken ? (
                         who ? (
@@ -151,13 +164,15 @@ export default function DraftTeamTable({
                         ) : (
                           <span className="tag-soft">taken</span>
                         )
-                      ) : (
+                      ) : canDraft ? (
                         <form action={draftTeamAction}>
                           {extraFormFields}
                           <input type="hidden" name="teamCode" value={tm.code} />
                           <input type="hidden" name="tier" value={tierFilter !== "all" ? tierFilter : ""} />
                           <button type="submit" className="draftbtn" disabled={!canPick}>Draft</button>
                         </form>
+                      ) : (
+                        <span className="avail-btn">Available</span>
                       )}
                     </td>
                   )}
@@ -166,7 +181,7 @@ export default function DraftTeamTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={canDraft ? 6 : 5} style={{ textAlign: "center", padding: 24, color: "var(--ink-faint)" }}>
+                <td colSpan={(canDraft || showAvailable) ? 6 : 5} style={{ textAlign: "center", padding: 24, color: "var(--ink-faint)" }}>
                   No teams match.
                 </td>
               </tr>
