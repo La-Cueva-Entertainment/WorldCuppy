@@ -102,14 +102,6 @@ export type MatchResult = {
   penaltyWinner?: string | null;
 };
 
-export type OddsJumpInput = {
-  teamCode: string;
-  /** Pre-tournament odds (American format, e.g. 350 or -225) */
-  draftOdds: number;
-  /** Odds at start of the round (for jump calculation) */
-  currentOdds: number;
-};
-
 /**
  * Returns earnings in cents for one player owning one team in one match.
  * Pass `ownsHome` / `ownsAway` separately and call twice if player owns both.
@@ -199,38 +191,6 @@ export function matchEarningsCents(
   earnFor(ownsAway, awayWon, awayScore, result.awayTeam, result.homeTeam);
 
   return total;
-}
-
-/**
- * Odds-jump bonus (group stage):
- *   2 positions better → +$1.00
- *   3+ positions better → +$2.00
- *
- * "Jump" = player's draft position minus current odds position.
- * Rankings are determined by sorting ascending by odds value (lower = favourite).
- */
-export function oddsJumpBonusCents(
-  teams: OddsJumpInput[],
-  ownerTeamCodes: string[],
-): number {
-  if (!teams.length || !ownerTeamCodes.length) return 0;
-
-  // Sort by draft odds ascending (lower number = bigger favourite = rank 1)
-  const sorted = teams.slice().sort((a, b) => a.draftOdds - b.draftOdds);
-  const draftRank = new Map(sorted.map((t, i) => [t.teamCode, i]));
-
-  const sortedCurrent = teams.slice().sort((a, b) => a.currentOdds - b.currentOdds);
-  const currentRank = new Map(sortedCurrent.map((t, i) => [t.teamCode, i]));
-
-  let bonus = 0;
-  for (const code of ownerTeamCodes) {
-    const from = draftRank.get(code) ?? 0;
-    const to = currentRank.get(code) ?? 0;
-    const jump = from - to; // positive = moved up (improved)
-    if (jump >= 3) bonus += 200;
-    else if (jump >= 2) bonus += 100;
-  }
-  return bonus;
 }
 
 /** Sum earnings in cents across multiple matches for one player's teams. */

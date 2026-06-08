@@ -114,15 +114,20 @@ export default async function HomePage() {
     select: { id: true, name: true, type: true, year: true, status: true, teamsPerPlayer: true, draftDate: true, payoutRules: true },
   });
 
-  // ── Today's matches ──────────────────────────────────────────────
+  // ── Upcoming matches (next scheduled day) ────────────────────────
   const nowPST = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
   const todayStart = new Date(Date.UTC(nowPST.getFullYear(), nowPST.getMonth(), nowPST.getDate(), 8, 0, 0));
-  const todayEnd = new Date(Date.UTC(nowPST.getFullYear(), nowPST.getMonth(), nowPST.getDate() + 1, 8, 0, 0));
+  const upcomingEnd = new Date(todayStart);
+  upcomingEnd.setDate(upcomingEnd.getDate() + 30);
 
-  const [todayDbMatches, allPicks, users, playedMatches, adjustments] = tournament
+  function pstDayStr(date: Date): string {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(date);
+  }
+
+  const [upcomingAllMatches, allPicks, users, playedMatches, adjustments] = tournament
     ? await Promise.all([
         prisma.match.findMany({
-          where: { tournamentId: tournament.id, matchDate: { gte: todayStart, lte: todayEnd } },
+          where: { tournamentId: tournament.id, matchDate: { gte: todayStart, lte: upcomingEnd } },
           orderBy: { matchDate: "asc" },
           select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, matchDate: true, venue: true },
         }),
@@ -141,6 +146,15 @@ export default async function HomePage() {
         }),
       ])
     : [[], [], [], [], []];
+
+  // Filter upcoming matches to just the first scheduled day
+  const firstDayStr = upcomingAllMatches[0]?.matchDate ? pstDayStr(upcomingAllMatches[0].matchDate) : null;
+  const upcomingDbMatches = firstDayStr
+    ? upcomingAllMatches.filter((m) => m.matchDate && pstDayStr(m.matchDate) === firstDayStr)
+    : [];
+  const upcomingDayLabel = upcomingAllMatches[0]?.matchDate
+    ? new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric" }).format(upcomingAllMatches[0].matchDate)
+    : null;
 
   const userById = new Map(users.map((u: { id: string; name: string | null; email: string | null }) => [u.id, u]));
   const playerIds = [...new Set(allPicks.map((p: { userId: string; teamCode: string }) => p.userId))].sort();
@@ -202,8 +216,8 @@ export default async function HomePage() {
               {tournament ? `${tournament.name} ${tournament.year}` : "World Cuppy"}
             </h1>
           </div>
-          {todayDbMatches.length > 0 && (
-            <span className="badge hot"><span className="live-dot"></span> {todayDbMatches.length} match{todayDbMatches.length !== 1 ? "es" : ""} today</span>
+          {upcomingDbMatches.length > 0 && (
+            <span className="badge hot"><span className="live-dot"></span> {upcomingDbMatches.length} match{upcomingDbMatches.length !== 1 ? "es" : ""}{upcomingDayLabel ? ` · ${upcomingDayLabel}` : ""}</span>
           )}
           {showLiveSync && <LiveSync />}
         </div>
@@ -282,19 +296,19 @@ export default async function HomePage() {
               </section>
             )}
 
-            {/* Today's matches */}
+            {/* Upcoming matches */}
             <section>
               <div className="sec-head">
-                <h2>Today&apos;s matches</h2>
+                <h2>Upcoming{upcomingDayLabel ? ` — ${upcomingDayLabel}` : " matches"}</h2>
                 <Link href="/standings" className="tag-soft" style={{ fontWeight: 700 }}>Bracket →</Link>
               </div>
-              {todayDbMatches.length === 0 ? (
+              {upcomingDbMatches.length === 0 ? (
                 <div className="card card-pad" style={{ textAlign: "center", color: "var(--ink-faint)", fontSize: "14px" }}>
-                  No matches scheduled for today.
+                  No upcoming matches scheduled.
                 </div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "14px" }}>
-                  {todayDbMatches.map((m) => {
+                  {upcomingDbMatches.map((m) => {
                     const homeWon = m.played && ((m.homeScore ?? 0) > (m.awayScore ?? 0) || m.penaltyWinner === m.homeTeam);
                     const awayWon = m.played && ((m.awayScore ?? 0) > (m.homeScore ?? 0) || m.penaltyWinner === m.awayTeam);
                     const kickoff = fmtTime(m.matchDate?.toISOString());

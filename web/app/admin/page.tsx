@@ -333,7 +333,8 @@ export default async function AdminPage({
   const ghostBtn = "rounded-lg bg-zinc-100 dark:bg-white/10 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/20";
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+    <main className="page">
+      <div className="wrap">
       <h1 className="mb-6 text-3xl font-extrabold text-zinc-900 dark:text-white">Admin Panel</h1>
 
       {resolved.msg && (
@@ -762,6 +763,7 @@ export default async function AdminPage({
           ))}
         </div>
       </section>
+      </div>
     </main>
   );
 }

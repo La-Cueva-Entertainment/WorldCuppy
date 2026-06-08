@@ -8,7 +8,12 @@ fi
 
 # Optional but strongly recommended for NextAuth
 if [ -z "${NEXTAUTH_SECRET:-}" ]; then
-  echo "WARN: NEXTAUTH_SECRET is not set (recommended in production)" >&2
+  if [ "${NODE_ENV:-}" = "production" ]; then
+    echo "ERROR: NEXTAUTH_SECRET must be set in production" >&2
+    exit 1
+  else
+    echo "WARN: NEXTAUTH_SECRET is not set (required in production)" >&2
+  fi
 fi
 
 # Wait for PostgreSQL to be reachable

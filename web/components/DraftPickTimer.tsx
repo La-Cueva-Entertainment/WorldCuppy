@@ -22,7 +22,9 @@ export function DraftPickTimer({ seconds, key: _key }: { seconds: number | null;
       setRemaining((prev) => {
         if (prev <= 1) {
           window.clearInterval(t);
-          router.refresh();
+          // Tell the server to advance past the current pick, then re-render
+          fetch("/api/draft/skip", { method: "POST" })
+            .finally(() => router.refresh());
           return 0;
         }
         return prev - 1;

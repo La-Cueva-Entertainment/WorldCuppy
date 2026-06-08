@@ -8,6 +8,9 @@ export async function POST() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // All authenticated users may trigger a sync. The server-side rate limiter in
+  // football-data.ts (max 1 external call per 7.5 s) prevents quota exhaustion
+  // regardless of how many browser tabs call this simultaneously.
   const result = await fetchWorldCupMatches();
 
   if (!result.ok) {
