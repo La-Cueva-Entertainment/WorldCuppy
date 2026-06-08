@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CountryFlag } from "@/components/CountryFlag";
+import { TEAM_PLAYERS } from "@/lib/players";
 
 interface TierData {
   key: string;
@@ -111,7 +112,8 @@ export default function DraftTeamTable({
             <tr>
               <th style={{ width: 46 }}>Flag</th>
               <th>Team</th>
-              <th>Tier · payout</th>
+              <th className="players-col hide-sm">Key players</th>
+              <th>Tier &middot; payout</th>
               <th className="r rk" style={{ width: 54 }}>FIFA</th>
               {canDraft && <th className="r act">Pick</th>}
             </tr>
@@ -127,6 +129,14 @@ export default function DraftTeamTable({
                     <CountryFlag code={tm.code} label={tm.name} className="flag-lg fi-rect" />
                   </td>
                   <td className="nm-cell">{tm.name}</td>
+                  <td className="players-col hide-sm">
+                    {(TEAM_PLAYERS[tm.code] ?? []).slice(0, 2).map((p) => (
+                      <span key={p.name} className="player-chip">
+                        <span className="pos-dot pos-{p.position.toLowerCase()}">{p.position}</span>
+                        {p.name}
+                      </span>
+                    ))}
+                  </td>
                   <td className="tier-cell">
                     <span className={`tier tier-${tm.tierNum}`}>{tm.tierLabel}</span>
                   </td>
@@ -156,7 +166,7 @@ export default function DraftTeamTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={canDraft ? 5 : 4} style={{ textAlign: "center", padding: 24, color: "var(--ink-faint)" }}>
+                <td colSpan={canDraft ? 6 : 5} style={{ textAlign: "center", padding: 24, color: "var(--ink-faint)" }}>
                   No teams match.
                 </td>
               </tr>

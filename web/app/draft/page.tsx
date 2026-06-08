@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
 import { CountdownTimer } from "@/components/CountdownTimer";
+import { DraftOrderStrip } from "@/components/DraftOrderStrip";
 import { DraftPickTimer } from "@/components/DraftPickTimer";
 import DraftTeamTable from "@/components/DraftTeamTable";
 import { authOptions } from "@/lib/auth";
@@ -97,6 +98,15 @@ export default async function DraftPage({
     if (raw) return raw.length > 22 ? raw.slice(0, 22).trimEnd() + "…" : raw;
     const u = userById.get(uid);
     return fallbackEmail ? (u?.name ?? u?.email?.split("@")[0] ?? "?") : (u?.name ?? "?");
+  }
+  // Returns "First L." when the user has a team name set, else null
+  function shortRealName(uid: string): string | null {
+    if (!teamNameById.has(uid)) return null; // no team name — real name is already showing
+    const u = userById.get(uid);
+    const full = u?.name ?? u?.email?.split("@")[0];
+    if (!full) return null;
+    const parts = full.trim().split(/\s+/);
+    return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
   }
   const orderUserIds = (draft?.orderUserIds as string[] | null) ?? [];
 
@@ -317,42 +327,21 @@ export default async function DraftPage({
             <DraftPickTimer seconds={PICK_SECONDS} key={currentPick} />
           </div>
 
-          {/* ── Draft grid: 260px rail | board ────────── */}
-          <div className="draft-grid">
+          {/* ── Draft order strip ───────────────────── */}
+          <DraftOrderStrip
+            participants={orderUserIds.map((uid, idx) => ({
+              userId: uid,
+              name: displayName(uid),
+              real: shortRealName(uid),
+              colorIndex: idx,
+            }))}
+            activeUserId={expectedTurnUserId}
+            currentUserId={userId}
+          />
 
-            {/* Left: manager rail */}
-            <aside className="card rail">
-              <div className="rail-h">Draft order</div>
-              {orderUserIds.map((uid, idx) => {
-                const name = displayName(uid);
-                const isMe = uid === userId;
-                const isOn = uid === expectedTurnUserId;
-                const picksMade = allPicks.filter((p) => p.userId === uid).length;
-                return (
-                  <div key={uid} className={`railrow m${idx % 8}${isOn ? " on" : ""}`}>
-                    <span className="ord">{idx + 1}</span>
-                    <span className={`mdot m${idx % 8}`} />
-                    <span className="nm">
-                      {name}
-                      {isMe && <span className="you">you</span>}
-                    </span>
-                    {isOn ? (
-                      <span className="clk">picking…</span>
-                    ) : (
-                      <span className="roster">
-                        {Array.from({ length: LINEUP_SIZE }).map((_, si) => (
-                          <span key={si} className={`sq${si < picksMade ? " f" : ""}`} />
-                        ))}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </aside>
-
-            {/* Right: team picker board */}
-            <div>
-              <DraftTeamTable
+          {/* ── Team picker board ─────────────────────── */}
+          <div>
+            <DraftTeamTable
                 tiers={tiers}
                 takenTeamCodes={takenTeamCodes}
                 myTeamCodes={myTeamCodes}
@@ -366,7 +355,6 @@ export default async function DraftPage({
                 initialTierKey={resolved.tier}
                 recentPicks={recentPicks}
               />
-            </div>
           </div>
         </>
       ) : (
@@ -390,49 +378,35 @@ export default async function DraftPage({
             )}
           </div>
 
-          {/* Draft grid: rail + team table (same layout as active, just no pick buttons) */}
+          {/* Draft order strip + team table */}
           {!draftComplete && (
-            <div className="draft-grid">
+            <>
               {orderUserIds.length > 0 && (
-                <aside className="card rail">
-                  <div className="rail-h">Draft order</div>
-                  {orderUserIds.map((uid, idx) => {
-                    const name = displayName(uid);
-                    const isMe = uid === userId;
-                    return (
-                      <div key={uid} className={`railrow m${idx % 8}`}>
-                        <span className="ord">{idx + 1}</span>
-                        <span className={`mdot m${idx % 8}`} />
-                        <span className="nm">
-                          {name}
-                          {isMe && <span className="you">you</span>}
-                        </span>
-                        <span className="roster">
-                          {Array.from({ length: LINEUP_SIZE }).map((_, si) => (
-                            <span key={si} className="sq" />
-                          ))}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </aside>
-              )}
-              <div>
-                <DraftTeamTable
-                  tiers={tiers}
-                  takenTeamCodes={takenTeamCodes}
-                  myTeamCodes={myTeamCodes}
-                  takenBy={takenBy}
-                  canDraft={false}
-                  canPickNow={false}
-                  picksCount={myPicks.length}
-                  lineupSize={LINEUP_SIZE}
-                  draftTeamAction={draftTeamAction}
-                  initialTierKey={resolved.tier}
-                  recentPicks={recentPicks}
+                <DraftOrderStrip
+                  participants={orderUserIds.map((uid, idx) => ({
+                    userId: uid,
+                    name: displayName(uid),
+                    real: shortRealName(uid),
+                    colorIndex: idx,
+                  }))}
+                  activeUserId={null}
+                  currentUserId={userId}
                 />
-              </div>
-            </div>
+              )}
+              <DraftTeamTable
+                tiers={tiers}
+                takenTeamCodes={takenTeamCodes}
+                myTeamCodes={myTeamCodes}
+                takenBy={takenBy}
+                canDraft={false}
+                canPickNow={false}
+                picksCount={myPicks.length}
+                lineupSize={LINEUP_SIZE}
+                draftTeamAction={draftTeamAction}
+                initialTierKey={resolved.tier}
+                recentPicks={recentPicks}
+              />
+            </>
           )}
         </>
       )}

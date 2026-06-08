@@ -368,7 +368,7 @@ html:not(.dark) .pitch-panel {
   .seg { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .seg::-webkit-scrollbar { display: none; }
   .seg button { flex: none; }
-  .card .tbl { min-width: 460px; }
+  .card .tbl { min-width: 0; }
   .sec-head h2 { font-size: 20px; }
   /* Home 2-col → 1 col */
   main .wrap > div[style*="grid-template-columns: 1fr 332px"] {
@@ -501,42 +501,51 @@ html:not(.dark) .pitch-panel {
   background: var(--surface); color: var(--ink-faint);
 }
 
-/* ── Draft grid (rail | board) ───────────────────────────── */
-.draft-grid { display: grid; grid-template-columns: 300px 1fr; gap: 22px; align-items: start; }
-
-/* Rail (manager list) — base styles first */
-.rail { position: sticky; top: 78px; padding: 6px; }
-.rail-h { font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700; font-size: 11px;
-  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint);
-  padding: 8px 10px; }
-.railrow { display: grid; grid-template-columns: 20px 16px 1fr auto; align-items: center; gap: 0 8px;
-  padding: 8px 10px; border-radius: 11px; border: 1.5px solid transparent; transition: background .1s; }
-.railrow.on { border-color: var(--m); background: color-mix(in srgb, var(--m) 12%, var(--surface)); }
-.railrow .ord { font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 800;
-  font-size: 12px; color: var(--ink-faint); text-align: center; grid-row: 1 / 3; }
-.railrow .mdot { grid-row: 1 / 3; }
-.railrow .nm  { font-weight: 800; font-size: 15px; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink);
-  grid-column: 3; grid-row: 1; }
-.railrow.on .nm { color: var(--m); }
-.railrow .nm .you { font-size: 11px; font-weight: 600; color: var(--ink-faint); margin-left: 5px; }
-.railrow .roster { display: flex; gap: 3px; grid-column: 3; grid-row: 2; margin-top: 4px; }
-.railrow .clk { grid-column: 4; grid-row: 1 / 3; font-family: var(--font-mono), 'Spline Sans Mono', monospace;
-  font-weight: 700; font-size: 16px; color: var(--m); }
-.railrow .sq { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid var(--ink-faint); }
-.railrow .sq.f { background: var(--m); border-color: var(--m); }
+/* ── Draft order strip (horizontal scrollable chips) ──────── */
+.order-strip {
+  display: flex; gap: 6px; overflow-x: auto; padding: 10px 12px;
+  scrollbar-width: none; background: var(--surface); border-radius: var(--r);
+  border: 1px solid var(--line); margin-bottom: 14px;
+}
+.order-strip::-webkit-scrollbar { display: none; }
+.order-chip {
+  display: flex; align-items: center; gap: 5px; padding: 5px 10px;
+  border-radius: 20px; background: var(--paper); border: 1.5px solid transparent;
+  font-size: 13px; white-space: nowrap; flex-shrink: 0; color: var(--ink-soft);
+  transition: border-color .12s, background .12s;
+}
+.order-chip.on {
+  border-color: var(--m); background: color-mix(in srgb, var(--m) 14%, var(--paper));
+  color: var(--ink); font-weight: 700;
+}
+.chip-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  background: var(--m); opacity: .55;
+}
+.order-chip.on .chip-dot { opacity: 1; }
+.chip-num { font-size: 11px; color: var(--ink-faint); }
+.chip-name { font-weight: 600; }
+.chip-real { font-size: 11px; font-weight: 400; color: var(--ink-faint); margin-left: 4px; }
+.chip-clk { font-size: 12px; font-weight: 700; color: var(--m); margin-left: 4px; }
 
 /* Team table (draft board) — base styles first */
-.teamtbl { width: 100%; min-width: 460px; }
+.teamtbl { width: 100%; min-width: 380px; }
 .teamtbl tr.taken td { opacity: .62; }
 .teamtbl tr.mine { background: color-mix(in srgb, var(--grass) 7%, var(--surface)); }
 .teamtbl tr.mine td { opacity: 1; }
 .teamtbl td.flag-cell { width: 46px; padding: 8px 4px 8px 12px; }
-.teamtbl td.nm-cell { font-weight: 700; font-size: 15px; }
-.teamtbl td.tier-cell { white-space: nowrap; }
+.teamtbl td.nm-cell { font-weight: 700; font-size: 15px; width: 160px; }
+.teamtbl td.players-col { width: auto; }
+.teamtbl td.tier-cell { white-space: nowrap; width: 130px; }
+.player-chip { display: inline-flex; align-items: center; gap: 5px; margin-right: 10px;
+  font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+.player-chip .pos-dot { font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700;
+  font-size: 10px; letter-spacing: .04em; color: var(--ink-faint);
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 4px; padding: 1px 4px; flex-shrink: 0; }
 .teamtbl .rk { font-family: var(--font-mono), 'Spline Sans Mono', monospace; font-size: 12px;
   color: var(--ink-faint); opacity: 0; transition: opacity .15s; }
-.teamtbl tr:hover .rk { opacity: 1; }
+.teamtbl tr.taken .rk { opacity: 1; }
 .teamtbl td.act { text-align: right; width: 130px; }
 .draftbtn {
   font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700; font-size: 13px;
@@ -548,40 +557,27 @@ html:not(.dark) .pitch-panel {
 
 /* ── Draft responsive overrides (all media queries AFTER base) ── */
 @media (max-width: 900px) {
-  /* Grid collapses: rail scrolls horizontally above the board */
-  .draft-grid { display: flex; flex-direction: column; gap: 14px; }
-  .draft-grid aside.rail { order: 1; width: 100%; }
-  .draft-grid > div { order: 2; }
-  /* Rail becomes a horizontal scrolling chip strip */
-  .rail { position: static; display: flex; flex-direction: row; overflow-x: auto;
-    gap: 6px; padding: 6px 8px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-  .rail::-webkit-scrollbar { display: none; }
-  .rail-h { display: none; }
-  /* Reset grid layout back to flex for horizontal chips */
-  .railrow { display: flex; align-items: center; flex: none; padding: 6px 10px; border-radius: 8px; gap: 6px; }
-  .railrow .ord { grid-row: unset; font-size: 11px; width: 13px; }
-  .railrow .mdot { grid-row: unset; }
-  .railrow .nm { grid-column: unset; grid-row: unset; font-size: 12px; max-width: 100px; flex: none; }
-  .railrow .roster { grid-column: unset; grid-row: unset; margin-top: 0; gap: 2px; }
-  .railrow .clk { grid-column: unset; grid-row: unset; font-size: 12px; }
-  .railrow .sq { width: 9px; height: 9px; }
+  /* strip already full-width; no extra rules needed */
 }
 
 @media (max-width: 680px) {
-  /* Controls: search goes full-width below the tier filter */
-  .draft-controls { gap: 8px; }
-  .draft-search { flex: 1 1 100%; order: 2; }
-  .draft-controls .seg { order: 1; overflow-x: auto; flex-wrap: nowrap; max-width: 100%; }
+  /* Prevent anything from blowing out the page width */
+  .draft-controls, .tbl-scroll { max-width: 100%; overflow-x: hidden; }
 
-  /* Team table: reflow into flex card rows, no horizontal scroll */
-  .tbl-scroll { overflow-x: visible; }
-  .teamtbl { min-width: 0; }
+  /* Controls: stacked column, seg fills width with equal buttons */
+  .draft-controls { flex-direction: column; align-items: stretch; gap: 8px; }
+  .draft-controls .seg { display: flex; width: 100%; }
+  .draft-controls .seg button {
+    flex: 1; min-width: 0; padding: 6px 0; font-size: 11px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;
+  }
+  .draft-search { width: 100%; }
+
+  /* Team table: reflow into flex card rows */
+  .teamtbl { min-width: 0; width: 100%; }
   .teamtbl, .teamtbl tbody { display: block; }
   .teamtbl thead { display: none; }
-  .teamtbl tbody tr {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px;
-  }
+  .teamtbl tbody tr { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
   .teamtbl tbody tr + tr { border-top: 1px solid var(--line); }
   .teamtbl td { display: block; padding: 0; border: 0; }
   .teamtbl td.flag-cell { width: 34px; flex: none; }
