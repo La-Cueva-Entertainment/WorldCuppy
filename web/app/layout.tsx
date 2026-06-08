@@ -9,6 +9,7 @@ import { NavLink } from "@/components/NavLink";
 import { SignOutButton } from "@/components/SignOutButton";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PresenceTracker } from "@/components/PresenceTracker";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
@@ -145,6 +146,7 @@ export default async function RootLayout({
       </head>
       <body className={`${archivo.variable} ${hanken.variable} ${splineMono.variable}`}>
         <ServiceWorkerRegister />
+        {session && <PresenceTracker />}
 
         {/* ── Top nav ───────────────────────────────────── */}
         <header className="nav">

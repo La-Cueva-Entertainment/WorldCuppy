@@ -5,10 +5,12 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import BanterFeed from "@/components/BanterFeed";
 
+// 2 minutes — matches the heartbeat window in PresenceTracker
+const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+
 function colorIdx(userId: string, sortedIds: string[]): number {
   const i = sortedIds.indexOf(userId);
   if (i >= 0) return i % 8;
-  // stable fallback: hash the userId
   let h = 0;
   for (let j = 0; j < userId.length; j++) h = (h * 31 + userId.charCodeAt(j)) | 0;
   return Math.abs(h) % 8;
@@ -28,7 +30,9 @@ export default async function BanterPage() {
   }
   if (!currentUserId) redirect("/login");
 
-  const [rawPosts, tournament] = await Promise.all([
+  const onlineThreshold = new Date(Date.now() - ONLINE_THRESHOLD_MS);
+
+  const [rawPosts, tournament, onlineUsers] = await Promise.all([
     prisma.banterPost.findMany({
       orderBy: { createdAt: "desc" },
       take: 60,
@@ -50,6 +54,11 @@ export default async function BanterPage() {
       where: { status: { in: ["upcoming", "draft", "active", "complete"] } },
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true, year: true, draftDate: true, status: true },
+    }),
+    prisma.user.findMany({
+      where: { lastSeenAt: { gte: onlineThreshold } },
+      orderBy: { lastSeenAt: "desc" },
+      select: { id: true, name: true, lastSeenAt: true },
     }),
   ]);
 
@@ -85,12 +94,21 @@ export default async function BanterPage() {
     ? { name: tournament.name, year: tournament.year, date: tournament.draftDate.toISOString(), status: tournament.status }
     : null;
 
+  const onlineUsersMapped = onlineUsers.map((u) => ({
+    id: u.id,
+    name: u.name,
+    lastSeenAt: u.lastSeenAt!.toISOString(),
+    colorIdx: colorIdx(u.id, authorIds),
+    isMe: u.id === currentUserId,
+  }));
+
   return (
     <BanterFeed
       initialPosts={posts}
       currentUserId={currentUserId}
       currentUserName={session.user.name ?? session.user.email?.split("@")[0] ?? "?"}
       draftInfo={draftInfo}
+      onlineUsers={onlineUsersMapped}
     />
   );
 }

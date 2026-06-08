@@ -15,14 +15,14 @@ function handler(req: NextRequest, ctx: unknown) {
   const explicitUrl = process.env.NEXTAUTH_URL;
 
   // Only override NEXTAUTH_URL in dev (when it points to localhost or is unset).
-  // In production set NEXTAUTH_URL explicitly in Docker env and this branch never runs.
-  // Private IPs and malformed host values are rejected to prevent host-header injection.
+  // Accept requests from localhost OR private-network IPs (e.g. 192.168.x.x phone on LAN).
+  // Reject malformed host values to prevent host-header injection.
   if (
     SAFE_HOST.test(host) &&
-    !PRIVATE_IP.test(host) &&
+    (PRIVATE_IP.test(host) || host.startsWith("localhost")) &&
     (!explicitUrl || explicitUrl.includes("localhost"))
   ) {
-    const proto = req.headers.get("x-forwarded-proto") ?? "https";
+    const proto = req.headers.get("x-forwarded-proto") ?? "http";
     process.env.NEXTAUTH_URL = `${proto}://${host}`;
   }
 

@@ -49,7 +49,15 @@ type DraftInfo = {
   status: string;
 } | null;
 
-type Filter = "all" | "takes" | "media" | "picks";
+type OnlineUser = {
+  id: string;
+  name: string | null;
+  lastSeenAt: string;
+  colorIdx: number;
+  isMe: boolean;
+};
+
+
 
 const EMOJIS = [
   "🔥","💀","🫡","👑","😭","⚽","🏆","😤","🤣","💸","😬","🎯","🫣","📉","📈","🪦",
@@ -73,6 +81,15 @@ function fmtRelTime(iso: string): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+// Suppress hydration mismatch: Date.now() differs between server render and client hydration
+function RelTime({ iso, className, style }: { iso: string; className?: string; style?: React.CSSProperties }) {
+  return (
+    <time dateTime={iso} suppressHydrationWarning className={className} style={style}>
+      {fmtRelTime(iso)}
+    </time>
+  );
 }
 
 function groupReactions(reactions: ReactionData[], myId: string) {
@@ -285,7 +302,7 @@ function ReplyThread({ postId, initialReplies, replyCount, myId, myName, myColor
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontFamily: "var(--font-archivo), Archivo, sans-serif", fontWeight: 800, fontSize: 13.5 }}>{r.authorName ?? "?"}</span>
-                <span style={{ fontSize: 11, color: "var(--ink-faint)" }}>{fmtRelTime(r.createdAt)}</span>
+                <RelTime iso={r.createdAt} style={{ fontSize: 11, color: "var(--ink-faint)" }} />
               </div>
               <div style={{ fontSize: 14, lineHeight: 1.45, marginTop: 3, wordBreak: "break-word" }}>{r.text}</div>
               {grouped.length > 0 && (
@@ -385,9 +402,6 @@ function PostComposer({ myId, myName, myColorIdx, onPost }: {
       </div>
       {expanded && (
         <div className="banter-comp-actions">
-          <button type="button" onClick={() => { setText((t) => t + "😂"); taRef.current?.focus(); }} className="banter-comp-btn">
-            😂 Emoji
-          </button>
           <div style={{ flex: 1 }} />
           <button type="button" onClick={submit} disabled={submitting || !text.trim()} className="btn btn-primary btn-sm">
             Post it
@@ -419,7 +433,7 @@ function PostCard({ post, myId, myName, myColorIdx, onReaction }: {
             <b style={{ color: `var(--m)` }} className={`m${post.colorIdx}`}>{post.authorName}</b>
             {" "}drafted <b>{d.teamCode ?? "a team"}</b>
           </span>
-          <span className="tag-soft" style={{ fontSize: 12, flexShrink: 0 }}>{fmtRelTime(post.createdAt)}</span>
+          <RelTime iso={post.createdAt} className="tag-soft" style={{ fontSize: 12, flexShrink: 0 }} />
         </div>
       </div>
     );
@@ -437,7 +451,7 @@ function PostCard({ post, myId, myName, myColorIdx, onReaction }: {
               <span className="muted"> · <span style={{ color: "var(--grass-deep)", fontWeight: 700 }}>${(Number(d.earnerCents) / 100).toFixed(2)} earned</span></span>
             )}
           </span>
-          <span className="tag-soft" style={{ fontSize: 12, flexShrink: 0 }}>{fmtRelTime(post.createdAt)}</span>
+          <RelTime iso={post.createdAt} className="tag-soft" style={{ fontSize: 12, flexShrink: 0 }} />
         </div>
       </div>
     );
@@ -456,7 +470,7 @@ function PostCard({ post, myId, myName, myColorIdx, onReaction }: {
                 <span className="mdot"></span>{post.authorName ?? "?"}
               </span>
             </div>
-            <div style={{ fontSize: 12, color: "var(--ink-faint)" }}>{fmtRelTime(post.createdAt)}</div>
+            <RelTime iso={post.createdAt} style={{ fontSize: 12, color: "var(--ink-faint)" }} />
           </div>
         </div>
 
@@ -490,7 +504,7 @@ function PostCard({ post, myId, myName, myColorIdx, onReaction }: {
           </svg>
           {post.replyCount > 0 ? `${post.replyCount} ${post.replyCount === 1 ? "reply" : "replies"}` : "Reply"}
         </button>
-        <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-faint)" }}>{fmtRelTime(post.createdAt)}</span>
+        <RelTime iso={post.createdAt} style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-faint)" }} />
       </div>
 
       {/* Replies */}
@@ -515,14 +529,15 @@ export default function BanterFeed({
   currentUserId,
   currentUserName,
   draftInfo,
+  onlineUsers = [],
 }: {
   initialPosts: PostData[];
   currentUserId: string;
   currentUserName: string;
   draftInfo: DraftInfo;
+  onlineUsers?: OnlineUser[];
 }) {
   const [posts, setPosts] = useState(initialPosts);
-  const [filter, setFilter] = useState<Filter>("all");
 
   // Stable color index for current user
   const myColorIdx = useCallback(() => {
@@ -552,31 +567,13 @@ export default function BanterFeed({
     await toggleReaction(postId, emoji);
   }
 
-  const visiblePosts = posts.filter((p) => {
-    if (filter === "takes") return !p.isSystem && !p.imageUrl && !p.gifUrl;
-    if (filter === "media") return !p.isSystem && (!!p.imageUrl || !!p.gifUrl);
-    if (filter === "picks") return p.isSystem;
-    return true;
-  });
+  const visiblePosts = posts.filter((p) => !p.isSystem);
 
   // Sidebar: top hot takes (most reacted non-system posts)
   const hotTakes = [...posts]
     .filter((p) => !p.isSystem && p.text)
     .sort((a, b) => b.reactions.length - a.reactions.length)
     .slice(0, 3);
-
-  // Sidebar: active users (most recent post per user)
-  const seenUsers = new Set<string>();
-  const activeUsers = posts
-    .filter((p) => !p.isSystem && !seenUsers.has(p.authorId) && seenUsers.add(p.authorId) !== undefined)
-    .slice(0, 4);
-
-  const TABS: { value: Filter; label: string }[] = [
-    { value: "all", label: "All" },
-    { value: "takes", label: "🔥 Hot takes" },
-    { value: "media", label: "📸 Media" },
-    { value: "picks", label: "⚽ Picks" },
-  ];
 
   return (
     <main className="page">
@@ -587,9 +584,9 @@ export default function BanterFeed({
             <div className="kicker grass">The group chat, but better</div>
             <h1 style={{ fontSize: "clamp(28px,4vw,38px)", marginTop: 4 }}>Banter</h1>
           </div>
-          {activeUsers.length > 0 && (
+          {onlineUsers.length > 0 && (
             <span className="badge hot" style={{ height: 28, fontSize: 13 }}>
-              <span className="live-dot" />{" "}{activeUsers.length} manager{activeUsers.length !== 1 ? "s" : ""} active
+              <span className="live-dot" />{" "}{onlineUsers.length} manager{onlineUsers.length !== 1 ? "s" : ""} online
             </span>
           )}
         </div>
@@ -597,6 +594,31 @@ export default function BanterFeed({
         <div className="banter-grid">
           {/* ── Feed column ── */}
           <div>
+            {/* Mobile-only compact strip: online users + hot take */}
+            {(onlineUsers.length > 0 || hotTakes.length > 0) && (
+              <div className="banter-mobile-strip">
+                {onlineUsers.length > 0 && (
+                  <span className="banter-mobile-pill">
+                    <span className="dot" />
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{onlineUsers.length} online</span>
+                    {onlineUsers.slice(0, 3).map((u) => (
+                      <span key={u.id} style={{ color: "var(--ink-soft)", fontSize: 12 }}>
+                        {u.isMe ? "you" : (u.name?.split(" ")[0] ?? "?")}
+                      </span>
+                    ))}
+                  </span>
+                )}
+                {hotTakes.slice(0, 2).map((p) => (
+                  <span key={p.id} className="banter-mobile-pill" style={{ maxWidth: 220 }}>
+                    <span style={{ flexShrink: 0 }}>{p.reactions[0]?.emoji ?? "🔥"}</span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", color: "var(--ink-soft)", fontSize: 12 }}>
+                      {p.text.slice(0, 40)}{p.text.length > 40 ? "…" : ""}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Composer */}
             <PostComposer
               myId={currentUserId}
@@ -605,24 +627,10 @@ export default function BanterFeed({
               onPost={handleNewPost}
             />
 
-            {/* Filter tabs */}
-            <div className="banter-tabs">
-              {TABS.map((t) => (
-                <button
-                  key={t.value}
-                  type="button"
-                  onClick={() => setFilter(t.value)}
-                  className={`banter-tab${filter === t.value ? " on" : ""}`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
             {/* Feed */}
             {visiblePosts.length === 0 ? (
               <div className="card card-pad" style={{ textAlign: "center", color: "var(--ink-faint)", fontSize: 14 }}>
-                No posts yet.{filter === "all" ? " Be the first to drop a hot take 🔥" : ""}
+                No posts yet. Be the first to drop a hot take 🔥
               </div>
             ) : (
               visiblePosts.map((p) => (
@@ -638,8 +646,8 @@ export default function BanterFeed({
             )}
           </div>
 
-          {/* ── Sidebar ── */}
-          <aside style={{ display: "grid", gap: 18, position: "sticky", top: 80, alignSelf: "start" }}>
+          {/* ── Sidebar (desktop only, hidden on mobile via CSS) ── */}
+          <aside className="banter-sidebar-desktop" style={{ display: "grid", gap: 18, position: "sticky", top: 80, alignSelf: "start" }}>
             {/* Top hot takes */}
             <section className="card">
               <div className="card-pad" style={{ paddingBottom: 6 }}>
@@ -665,19 +673,32 @@ export default function BanterFeed({
               )}
             </section>
 
-            {/* Active now */}
-            {activeUsers.length > 0 && (
+            {/* Active now — real presence from heartbeat */}
+            {onlineUsers.length > 0 && (
               <section className="card card-pad">
-                <h2 style={{ fontSize: 17, marginBottom: 10 }}>Active now</h2>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <h2 style={{ fontSize: 17, flex: 1 }}>Active now</h2>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--grass-deep)", fontWeight: 700 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--grass)", display: "inline-block", animation: "blink 1.6s ease-in-out infinite" }} />
+                    {onlineUsers.length} online
+                  </span>
+                </div>
                 <div>
-                  {activeUsers.map((p) => (
-                    <div key={p.authorId} className="banter-active-row">
-                      <Avatar name={p.authorName} colorIdx={p.colorIdx} size="sm" />
+                  {onlineUsers.map((u) => (
+                    <div key={u.id} className="banter-active-row">
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        <Avatar name={u.name} colorIdx={u.colorIdx} size="sm" />
+                        <span style={{
+                          position: "absolute", bottom: 0, right: 0,
+                          width: 8, height: 8, borderRadius: "50%",
+                          background: "var(--grass)",
+                          border: "1.5px solid var(--surface)",
+                        }} />
+                      </div>
                       <span style={{ flex: 1, fontWeight: 700, fontSize: 14 }}>
-                        {p.authorName ?? "?"}
-                        {p.authorId === currentUserId && <span style={{ fontWeight: 400, color: "var(--ink-faint)", fontSize: 12 }}> (you)</span>}
+                        {u.name ?? "?"}
+                        {u.isMe && <span style={{ fontWeight: 400, color: "var(--ink-faint)", fontSize: 12 }}> (you)</span>}
                       </span>
-                      <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>{fmtRelTime(p.createdAt)}</span>
                     </div>
                   ))}
                 </div>
