@@ -503,7 +503,7 @@ html:not(.dark) .pitch-panel {
 }
 
 /* ── Draft grid (aside | board) ─────────────────────── */
-.draft-grid { display: grid; grid-template-columns: 260px 1fr; gap: 22px; align-items: start; }
+.draft-grid { display: grid; grid-template-columns: 260px minmax(0, 660px); gap: 22px; align-items: start; }
 
 /* Rail panel (left aside) */
 .rail-panel { position: sticky; top: 78px; padding: 6px; }
@@ -545,17 +545,20 @@ html:not(.dark) .pitch-panel {
 .chip-clk { font-size: 12px; font-weight: 700; color: var(--m); margin-left: 4px; }
 
 /* Team table (draft board) — base styles first */
-.teamtbl { width: 100%; min-width: 380px; }
+.teamtbl { width: 100%; min-width: 0; table-layout: fixed; }
 .teamtbl tr.taken td { opacity: .62; }
 .teamtbl tr.mine { background: color-mix(in srgb, var(--grass) 7%, var(--surface)); }
 .teamtbl tr.mine td { opacity: 1; }
-.teamtbl td.flag-cell { width: 46px; padding: 8px 4px 8px 12px; }
-.teamtbl td.nm-cell { font-weight: 700; font-size: 15px; width: 160px; }
-.teamtbl td.players-col { width: auto; }
-.teamtbl .nm-player { display: none; }
+.teamtbl td.flag-cell { width: 44px; padding: 8px 4px 8px 12px; }
+.teamtbl th.flag-cell { width: 44px; }
+.teamtbl td.nm-cell { font-weight: 700; font-size: 15px; overflow: hidden; }
+.teamtbl td.players-col { display: none; }
+.teamtbl th.players-col { display: none; }
+.teamtbl .nm-player { display: block; font-size: 12px; font-weight: 400; color: var(--ink-faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .teamtbl .nm-tier { display: none; }
-.teamtbl .nm-name-row { display: flex; align-items: center; gap: 7px; }
-.teamtbl td.tier-cell { white-space: nowrap; width: 130px; }
+.teamtbl .nm-name-row { display: flex; align-items: center; gap: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.teamtbl td.tier-cell { white-space: nowrap; width: 150px; }
+.teamtbl th.tier-cell { width: 150px; }
 .player-chip { display: inline-flex; align-items: center; gap: 5px; margin-right: 10px;
   font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
 .player-chip .pos-dot { font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700;
@@ -565,7 +568,10 @@ html:not(.dark) .pitch-panel {
 .teamtbl .rk { font-family: var(--font-mono), 'Spline Sans Mono', monospace; font-size: 12px;
   color: var(--ink-faint); opacity: 0; transition: opacity .15s; }
 .teamtbl tr.taken .rk { opacity: 1; }
-.teamtbl td.act { text-align: right; width: 130px; }
+.teamtbl td.act { text-align: right; width: 180px; }
+.teamtbl th.act { width: 180px; }
+.teamtbl td.act .m-chip { max-width: 172px; overflow: hidden; white-space: nowrap; display: inline-flex; }
+.teamtbl td.act .m-chip .chip-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
 .draftbtn {
   font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700; font-size: 13px;
   cursor: pointer; height: 32px; padding: 0 16px;
@@ -595,6 +601,7 @@ html:not(.dark) .pitch-panel {
 @media (max-width: 680px) {
   /* Prevent anything from blowing out the page width */
   .draft-controls, .tbl-scroll { max-width: 100%; overflow-x: hidden; }
+  .teamtbl { width: 100%; }
 
   /* Controls: stacked column, seg fills width with equal buttons */
   .draft-controls { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -618,7 +625,8 @@ html:not(.dark) .pitch-panel {
   .teamtbl .nm-tier { display: inline-flex; font-size: 11px; padding: 1px 6px; }
   .teamtbl td.tier-cell { display: none !important; }
   .teamtbl td.rk { display: none; }
-  .teamtbl td.act { flex: none; text-align: right; width: auto; }
+  .teamtbl td.act { flex: none; text-align: right; width: 130px; }
+  .teamtbl td.act .m-chip { max-width: 122px; }
   .teamtbl tr.mine { background: color-mix(in srgb, var(--grass) 7%, var(--surface)) !important; }
   .teamtbl tr.mine td { opacity: 1 !important; }
   .draftbtn { height: 38px; min-width: 68px; font-size: 14px; padding: 0 14px; }

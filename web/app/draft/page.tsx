@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
+import { DraftAutoRefresh } from "@/components/DraftAutoRefresh";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { DraftOrderStrip } from "@/components/DraftOrderStrip";
 import { DraftPickTimer } from "@/components/DraftPickTimer";
@@ -450,8 +451,7 @@ export default async function DraftPage({
       )}
 
       {draftActive ? (
-        <>
-          {/* ── Clockbar ──────────────────────────────── */}
+        <>          <DraftAutoRefresh />          {/* ── Clockbar ──────────────────────────────── */}
           <div className="clockbar pitch-panel">
             <div className="who">
               <div className="lbl">● On the clock</div>
@@ -493,7 +493,7 @@ export default async function DraftPage({
                 picksCount={myPicks.length}
                 lineupSize={LINEUP_SIZE}
                 draftTeamAction={draftTeamAction}
-                extraFormFields={<input type="hidden" name="tournamentId" value={tournament.id} />}
+                extraFormFields={<input key="tid" type="hidden" name="tournamentId" value={tournament.id} />}
                 initialTierKey={resolved.tier}
                 recentPicks={recentPicks}
               />

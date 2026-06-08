@@ -112,12 +112,10 @@ export default function DraftTeamTable({
         <table className="tbl teamtbl">
           <thead>
             <tr>
-              <th style={{ width: 44 }}>Flag</th>
-              <th style={{ width: 140 }}>Team</th>
-              <th className="players-col hide-sm">Key players</th>
-              <th style={{ width: 130 }}>Tier &middot; payout</th>
-              <th className="r rk" style={{ width: 54 }}>FIFA</th>
-              {canDraft && <th className="r act" style={{ width: 100 }}>Pick</th>}
+              <th className="flag-cell">Flag</th>
+              <th>Team</th>
+              <th className="tier-cell">Tier &middot; payout</th>
+              {(canDraft || showAvailable) && <th className="r act">Pick</th>}
             </tr>
           </thead>
           <tbody>
@@ -133,35 +131,24 @@ export default function DraftTeamTable({
                   <td className="nm-cell">
                     <span className="nm-name-row">
                       {tm.name}
-                      <span className={`tier tier-${tm.tierNum} nm-tier`}>{tm.tierLabel}</span>
                     </span>
                     {(() => {
                       const players = (TEAM_PLAYERS[tm.code] ?? []).slice(0, 2);
                       return players.length > 0 ? (
-                        <span className="nm-player">{players.map(p => p.name).join(" · ")}</span>
+                        <span className="nm-player">{players.map(p => `${p.position} ${p.name}`).join(" · ")}</span>
                       ) : null;
                     })()}
-                  </td>
-                  <td className="players-col hide-sm">
-                    <div style={{ maxWidth: 190, overflow: "hidden" }}>
-                      {(TEAM_PLAYERS[tm.code] ?? []).slice(0, 2).map((p) => (
-                        <span key={p.name} className="player-chip">
-                          <span className="pos-dot pos-{p.position.toLowerCase()}">{p.position}</span>
-                          {p.name}
-                        </span>
-                      ))}
-                    </div>
                   </td>
                   <td className="tier-cell">
                     <span className={`tier tier-${tm.tierNum}`}>{tm.tierLabel}</span>
                   </td>
-                  <td className="r rk">#{tm.rank}</td>
                   {(canDraft || showAvailable) && (
                     <td className="act">
                       {taken ? (
                         who ? (
                           <span className={`m-chip m${who.colorIndex % 8}`}>
-                            <span className="mdot" />{who.label}
+                            <span className="mdot" />
+                            <span className="chip-lbl">{who.label}</span>
                           </span>
                         ) : (
                           <span className="tag-soft">taken</span>
@@ -183,7 +170,7 @@ export default function DraftTeamTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={(canDraft || showAvailable) ? 6 : 5} style={{ textAlign: "center", padding: 24, color: "var(--ink-faint)" }}>
+                <td colSpan={(canDraft || showAvailable) ? 4 : 3} style={{ textAlign: "center", padding: 24, color: "var(--ink-faint)" }}>
                   No teams match.
                 </td>
               </tr>
