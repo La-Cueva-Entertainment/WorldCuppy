@@ -291,13 +291,13 @@ export default async function DraftPage({
       <div className="wrap">
 
       {/* ── Page header ─────────────────────────────── */}
-      <div className="between" style={{ flexWrap: "wrap", gap: "10px", marginBottom: "6px" }}>
+      <div className="between" style={{ flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
         <div>
           <div className={`kicker ${draftActive ? "grass" : ""}`}>
             {draftActive ? "Snake draft · Live" : draftComplete ? "Snake draft · Complete" : "Snake draft · Scheduled"}
           </div>
-          <h1>Draft Console</h1>
-          <p className="muted">
+          <h1 style={{ marginTop: 4 }}>Draft Console</h1>
+          <p className="muted" style={{ margin: "4px 0 0" }}>
             {tournament.name} {tournament.year} · {LINEUP_SIZE} teams per player ·{" "}
             {currentPick} of {maxPicks} picked
           </p>

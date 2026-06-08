@@ -44,9 +44,14 @@ export default async function LineupPage() {
     return (
       <main className="page">
         <div className="wrap">
-          <div className="kicker">My Teams</div>
-          <h1>No active tournament</h1>
-          <p className="muted">Your picks will appear here once a tournament is underway.</p>
+          <div className="between" style={{ flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+            <div>
+              <h1 style={{ marginTop: 4 }}>My Teams</h1>
+            </div>
+          </div>
+          <div className="card" style={{ padding: "20px 24px" }}>
+            <p style={{ color: "var(--ink-soft)" }}>No active tournament &mdash; your picks will appear here once a tournament is underway.</p>
+          </div>
         </div>
       </main>
     );
@@ -184,13 +189,13 @@ export default async function LineupPage() {
     <main className="page">
       <div className="wrap">
 
-        <div className="between" style={{ flexWrap: "wrap", gap: 10, marginBottom: 6 }}>
+        <div className="between" style={{ flexWrap: "wrap", gap: 10, marginBottom: 18 }}>
           <div>
-            <div className="kicker">{myDisplayName} · {tournament.name} {tournament.year}</div>
-            <h1>My Teams</h1>
+            <div className="kicker grass">{myDisplayName} · {tournament.name} {tournament.year}</div>
+            <h1 style={{ marginTop: 4, whiteSpace: "nowrap" }}>My Teams</h1>
           </div>
           {tournament.status === "draft" && (
-            <Link href="/draft" className="btn">Go to draft →</Link>
+            <Link href="/draft" className="btn btn-primary btn-sm">Go to draft →</Link>
           )}
         </div>
 

@@ -12,6 +12,7 @@ const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
 export default async function StandingsPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
+  const userId = session.user.id ?? null;
 
   const tournament = await prisma.tournament.findFirst({
     where: { status: { in: ["draft", "active", "complete"] } },
@@ -21,14 +22,16 @@ export default async function StandingsPage() {
 
   if (!tournament) {
     return (
-      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
-        <h1 className="mb-8 text-3xl font-extrabold text-zinc-900 dark:text-white">Standings</h1>
-        <div className="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 px-6 py-16 text-center">
-          <div className="text-4xl mb-3">📊</div>
-          <h2 className="text-lg font-bold text-zinc-900 dark:text-white">No active tournament</h2>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Standings and bracket will appear here once a tournament is underway.
-          </p>
+      <main className="page">
+        <div className="wrap">
+          <div className="between" style={{ flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
+            <div>
+              <h1 style={{ marginTop: 4 }}>Standings</h1>
+            </div>
+          </div>
+          <div className="card" style={{ padding: "20px 24px" }}>
+            <p style={{ color: "var(--ink-soft)" }}>No active tournament &mdash; standings and bracket will appear here once a tournament is underway.</p>
+          </div>
         </div>
       </main>
     );
@@ -132,7 +135,7 @@ export default async function StandingsPage() {
     const teams = [...(teamsByPlayer.get(r.uid) ?? [])].map((code) => ({
       code, name: TEAMS_BY_CODE.get(code)?.name ?? code,
     }));
-    return { id: r.uid, name: displayName(r.uid), earnings: r.earnings, teams, colorIdx: r.colorIdx };
+    return { id: r.uid, name: displayName(r.uid), earnings: r.earnings, teams, colorIdx: r.colorIdx, isYou: r.uid === userId };
   });
 
   const tvMatchesByStage: Partial<Record<string, TvMatch[]>> = {};

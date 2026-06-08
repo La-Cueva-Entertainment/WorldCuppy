@@ -1,5 +1,6 @@
 import { CountryFlag } from "@/components/CountryFlag";
 import { CountdownTimer } from "@/components/CountdownTimer";
+import { KnockoutBracket } from "@/components/KnockoutBracket";
 import { LiveSync } from "@/components/LiveSync";
 import PayoutRulesCard from "@/components/PayoutRulesCard";
 import { formatDollars, type PayoutRules, DEFAULT_PAYOUT_RULES } from "@/lib/earnings";
@@ -10,6 +11,7 @@ export type TvPlayer = {
   earnings: number;
   teams: { code: string; name: string }[];
   colorIdx: number;
+  isYou?: boolean;
 };
 
 export type TvPayout = {
@@ -95,6 +97,24 @@ export default function TournamentView({
   const rules = payoutRules ?? DEFAULT_PAYOUT_RULES;
   const isWorldCup = type === "world_cup" || !type;
 
+  // Derive the current stage for the kicker: latest stage with any played match, else earliest with games
+  const currentStageKey = (() => {
+    for (let i = STAGE_ORDER.length - 1; i >= 0; i--) {
+      const s = STAGE_ORDER[i]!;
+      if (matchesByStage[s]?.some((m) => m.played)) return s;
+    }
+    for (const s of STAGE_ORDER) {
+      if ((matchesByStage[s]?.length ?? 0) > 0) return s;
+    }
+    return null;
+  })();
+  const currentStageLabel = currentStageKey ? STAGE_LABELS[currentStageKey] : null;
+  const kickerText = status === "active"
+    ? [currentStageLabel, "Live"].filter(Boolean).join(" · ")
+    : status === "complete" ? "Final · Complete"
+    : status === "draft" ? "Snake Draft · Scheduled"
+    : null;
+
   return (
     <main className="page">
       <div className="wrap">
@@ -116,13 +136,12 @@ export default function TournamentView({
 
       <div className="mb-8 between" style={{ flexWrap: "wrap", gap: "10px" }}>
         <div>
-          <div className="kicker grass">{status ?? "Standings"}</div>
-          <h1 style={{ fontSize: "clamp(26px,4vw,34px)", marginTop: "4px" }}>
-            {name} <span style={{ color: "var(--grass)" }}>{year}</span>
+          {kickerText && <div className="kicker grass">{kickerText}</div>}
+          <h1 style={{ marginTop: kickerText ? 4 : 0 }}>
+            Standings
           </h1>
         </div>
         <div className="mt-1 flex items-center gap-3">
-          {!isDemo && status && <span className="badge">{status}</span>}
           {showLiveSync && <LiveSync />}
         </div>
       </div>
@@ -191,140 +210,51 @@ export default function TournamentView({
         </section>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[360px_1fr]">
-        {/* Standings */}
-        <section>
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Standings</h2>
-          <div className="overflow-hidden rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-100 dark:border-white/5 text-xs text-zinc-500 dark:text-zinc-400">
-                  <th className="w-8 py-3 pl-4 text-left font-medium">#</th>
-                  <th className="py-3 text-left font-medium">Player</th>
-                  <th className="py-3 pr-4 text-right font-medium">Earned</th>
-                </tr>
-              </thead>
-              <tbody>
-                {players.map((player, i) => {
-                  const c = colorFor(player.colorIdx);
-                  return (
-                    <tr key={player.id} className="border-b border-zinc-50 dark:border-white/5 last:border-0 hover:bg-zinc-50 dark:hover:bg-white/5">
-                      <td className="py-3 pl-4 font-mono text-xs text-zinc-400 dark:text-zinc-500">{i + 1}</td>
-                      <td className="py-3 pr-2">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className={`h-2 w-2 rounded-full ${c.dot}`} />
-                            <span className="font-semibold text-zinc-900 dark:text-white">{player.name}</span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-1 pl-4">
-                            {player.teams.map((t) => (
-                              <span key={t.code} className={`flex min-w-0 items-center gap-1 overflow-hidden rounded-md border px-1.5 py-0.5 text-xs font-medium ${c.teamBg}`}>
-                                <CountryFlag code={t.code} label={t.name} className="h-3 w-4 shrink-0" />
-                                <span className="truncate">{t.name}</span>
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </td>
-                      <td className={`py-3 pr-4 text-right font-bold tabular-nums ${c.text}`}>
-                        {formatDollars(player.earnings)}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {players.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="py-8 text-center text-zinc-400 dark:text-zinc-500">
-                      No picks yet — go draft your teams!
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <PayoutRulesCard rules={rules} isWorldCup={isWorldCup} />
-
-        {/* Bracket */}
-        <section>
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Tournament Bracket</h2>
-          <div className="space-y-6">
-            {STAGE_ORDER.map((stage) => {
-              const stageMatches = matchesByStage[stage] ?? [];
-              if (stageMatches.length === 0) return null;
-              return (
-                <div key={stage}>
-                  <div className="mb-2 flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-zinc-700 dark:text-zinc-300">{STAGE_LABELS[stage] ?? stage}</h3>
-                    <div className="h-px flex-1 bg-zinc-100 dark:bg-white/10" />
+      <div className="stand-grid">
+        {/* Left: leaderboard */}
+        <section className="card" style={{ padding: 8 }}>
+          {players.map((player, i) => {
+            const medal = i === 0 ? "gold" : i === 1 ? "silver" : i === 2 ? "bronze" : "";
+            const isYou = player.colorIdx === -1 /* set by page */ || false;
+            const leader = players[0];
+            const diff = leader && i > 0 ? leader.earnings - player.earnings : 0;
+            return (
+              <div key={player.id} className={`lb-row${player.isYou ? " you" : ""}`}>
+                <div className={`lb-pos${medal ? " " + medal : ""}`}>{i + 1}</div>
+                <div>
+                  <div className="lb-name">
+                    <span className={`mdot m${player.colorIdx % 8}`} />
+                    {player.name}
+                    {player.isYou && <span className="tag-soft" style={{ fontWeight: 600 }}>you</span>}
                   </div>
-                  <div className={`grid gap-2 ${stage === "group" ? "sm:grid-cols-2" : "grid-cols-1 max-w-xl"}`}>
-                    {stageMatches.map((m) => {
-                      const homeWon = m.played && ((m.homeScore ?? 0) > (m.awayScore ?? 0) || m.penaltyWinner === m.homeTeam);
-                      const awayWon = m.played && ((m.awayScore ?? 0) > (m.homeScore ?? 0) || m.penaltyWinner === m.awayTeam);
-                      const homeOwner = (m.homeOwnerNames ?? []).join(" & ");
-                      const awayOwner = (m.awayOwnerNames ?? []).join(" & ");
-                      const homeColor = m.homeOwnerColorIdx != null ? colorFor(m.homeOwnerColorIdx) : null;
-                      const awayColor = m.awayOwnerColorIdx != null ? colorFor(m.awayOwnerColorIdx) : null;
-                      return (
-                        <div key={m.id} className={`overflow-hidden rounded-xl border bg-white dark:bg-white/5 ${
-                          m.played ? "border-zinc-200 dark:border-white/10" : "border-zinc-100 dark:border-white/5 opacity-60"
-                        }`}>
-                          {(m.groupName || (!m.played && m.matchDateISO)) && (
-                            <div className="flex justify-between border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                              {m.groupName ? <span>Group {m.groupName}</span> : <span />}
-                              {!m.played && m.matchDateISO && <span>{fmtTime(m.matchDateISO, true)}</span>}
-                            </div>
-                          )}
-                          {!m.played && m.venue && (
-                            <div className="truncate border-b border-zinc-100 dark:border-white/5 px-3 py-1 text-[10px] text-zinc-400 dark:text-zinc-500">{m.venue}</div>
-                          )}
-                          <div className="flex items-stretch">
-                            <div className={`flex flex-1 items-center gap-2.5 px-3 py-3 ${homeWon ? "" : m.played ? "opacity-50" : ""}`}>
-                              <CountryFlag code={m.homeTeam} label={m.homeTeamName} className="h-6 w-8 shrink-0 rounded shadow-sm" />
-                              <div className="min-w-0">
-                                <div className={`text-sm font-semibold ${homeWon ? "text-zinc-900 dark:text-white" : "text-zinc-600 dark:text-zinc-400"}`}>{m.homeTeamName}</div>
-                                {homeOwner && <div className={`text-[10px] font-medium ${homeColor ? homeColor.text : "text-zinc-400 dark:text-zinc-500"}`}>{homeOwner}</div>}
-                              </div>
-                            </div>
-                            <div className="flex shrink-0 flex-col items-center justify-center border-x border-zinc-100 dark:border-white/5 px-3">
-                              {m.played ? (
-                                <>
-                                  <div className="flex items-center gap-2 font-mono text-lg font-bold leading-none">
-                                    <span className={homeWon ? "text-zinc-900 dark:text-white" : "text-zinc-400 dark:text-zinc-500"}>{m.homeScore}</span>
-                                    <span className="text-zinc-300 dark:text-zinc-600">–</span>
-                                    <span className={awayWon ? "text-zinc-900 dark:text-white" : "text-zinc-400 dark:text-zinc-500"}>{m.awayScore}</span>
-                                  </div>
-                                  {m.penaltyWinner && <span className="mt-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">pens</span>}
-                                </>
-                              ) : (
-                                <span className="text-xs font-medium text-zinc-300 dark:text-zinc-600">vs</span>
-                              )}
-                            </div>
-                            <div className={`flex flex-1 flex-row-reverse items-center gap-2.5 px-3 py-3 ${awayWon ? "" : m.played ? "opacity-50" : ""}`}>
-                              <CountryFlag code={m.awayTeam} label={m.awayTeamName} className="h-6 w-8 shrink-0 rounded shadow-sm" />
-                              <div className="min-w-0 text-right">
-                                <div className={`text-sm font-semibold ${awayWon ? "text-zinc-900 dark:text-white" : "text-zinc-600 dark:text-zinc-400"}`}>{m.awayTeamName}</div>
-                                {awayOwner && <div className={`text-[10px] font-medium ${awayColor ? awayColor.text : "text-zinc-400 dark:text-zinc-500"}`}>{awayOwner}</div>}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="lb-teams">
+                    {player.teams.map((t) => (
+                      <CountryFlag key={t.code} code={t.code} label={t.name} className="flag-md fi-rect" />
+                    ))}
                   </div>
                 </div>
-              );
-            })}
-            {!hasAnyMatches && (
-              <p className="py-8 text-center text-zinc-500 dark:text-zinc-400">
-                No matches entered yet. Admin can add them via the Admin panel.
-              </p>
-            )}
-          </div>
+                <div className="lb-earn">
+                  <div className="money pos">{formatDollars(player.earnings)}</div>
+                  <div className="d">{i === 0 ? "leader" : `\u2212${formatDollars(diff)}`}</div>
+                </div>
+              </div>
+            );
+          })}
+          {players.length === 0 && (
+            <p style={{ padding: "24px 14px", color: "var(--ink-faint)", textAlign: "center" }}>
+              No picks yet &mdash; go draft your teams!
+            </p>
+          )}
         </section>
+
+        {/* Right: pool + payout rules */}
+        <aside style={{ display: "grid", gap: 18, position: "sticky", top: 80 }}>
+          <PayoutRulesCard rules={rules} isWorldCup={isWorldCup} />
+        </aside>
       </div>
+
+      {/* Full-width knockout bracket */}
+      <KnockoutBracket matchesByStage={matchesByStage} />
       </div>
     </main>
   );
