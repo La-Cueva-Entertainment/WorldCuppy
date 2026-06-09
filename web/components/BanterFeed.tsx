@@ -727,16 +727,28 @@ export default function BanterFeed({
   const push = usePushNotifications();
   const router = useRouter();
 
-  // Sync server data into local state when Next.js re-fetches (router.refresh)
+  // Merge server data: add new posts from server, drop optimistic posts whose
+  // text is now confirmed in server data. Never wipe an unconfirmed optimistic post.
   useEffect(() => {
-    setPosts(initialPosts);
+    setPosts(prev => {
+      const serverTexts = new Set(
+        initialPosts.filter(p => !p.isSystem).map(p => p.text?.trim()).filter(Boolean)
+      );
+      // Keep optimistic posts whose text hasn't appeared on the server yet
+      const pendingOptimistic = prev.filter(
+        p => p.id.startsWith("opt-") && !serverTexts.has(p.text?.trim())
+      );
+      return [...pendingOptimistic, ...initialPosts];
+    });
   }, [initialPosts]);
 
   // Poll for new messages every 15 seconds
+  const routerRef = useRef(router);
+  routerRef.current = router;
   useEffect(() => {
-    const id = setInterval(() => router.refresh(), 15_000);
+    const id = setInterval(() => routerRef.current.refresh(), 15_000);
     return () => clearInterval(id);
-  }, [router]);
+  }, []);
 
   // Stable color index for current user
   const myColorIdx = useCallback(() => {
