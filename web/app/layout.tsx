@@ -135,6 +135,23 @@ export default async function RootLayout({
             document.documentElement.classList.toggle('dark', t === 'dark');
           } catch(e) {}
         `}} />
+        {/* Reload on stale deployment: if a /_next/ CSS/JS chunk 404s after a redeploy, force a full reload to pick up the new build's asset hashes */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            var _reloaded = false;
+            window.addEventListener('error', function(e) {
+              if (_reloaded) return;
+              var el = e.target;
+              if (el && (el.tagName === 'LINK' || el.tagName === 'SCRIPT')) {
+                var src = el.href || el.src || '';
+                if (src.indexOf('/_next/') !== -1) {
+                  _reloaded = true;
+                  window.location.reload();
+                }
+              }
+            }, true);
+          })();
+        `}} />
         <link rel="manifest" href="/manifest.webmanifest" />
         <meta name="theme-color" content="#0c5e34" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
