@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 
 import { DraftAutoRefresh } from "@/components/DraftAutoRefresh";
@@ -10,6 +11,7 @@ import DraftTeamTable from "@/components/DraftTeamTable";
 import { authOptions } from "@/lib/auth";
 import { postPickMade } from "@/lib/discord";
 import { activateDraft, getSnakeTurnUserId } from "@/lib/draft";
+import { generateDraftAnalysis } from "@/lib/draftAnalysis";
 import { buildDraftTiers } from "@/lib/draftTiers";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
@@ -266,6 +268,11 @@ export default async function DraftPage({
       }
     } catch { /* ignore Discord failures */ }
 
+    // Kick off AI draft analysis when the last pick is made — fire and forget
+    if (_pickAt >= 0 && (_pickAt + 1) >= _maxPicks) {
+      generateDraftAnalysis(tournamentId).catch(() => { /* best-effort */ });
+    }
+
     redirectDraft();
   }
 
@@ -397,6 +404,11 @@ export default async function DraftPage({
         });
       }
     } catch { /* ignore Discord failures */ }
+
+    // Kick off AI draft analysis when admin completes the last pick — fire and forget
+    if (_pickAt >= 0 && (_pickAt + 1) >= _maxPicks) {
+      generateDraftAnalysis(tournamentId).catch(() => { /* best-effort */ });
+    }
 
     redirect("/draft");
   }
@@ -546,6 +558,15 @@ export default async function DraftPage({
                   ? "No participants enrolled yet. An admin needs to set up the draft."
                   : "Draft has not started yet. Waiting for the scheduled time."}
             </p>
+            {draftComplete && (
+              <Link
+                href="/draft/analysis"
+                className="btn btn-primary btn-sm"
+                style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                🤖 View AI Report Cards →
+              </Link>
+            )}
             {!draftComplete && tournament.draftDate && (
               <div style={{ marginTop: 16 }}>
                 <CountdownTimer

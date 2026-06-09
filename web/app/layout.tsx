@@ -181,6 +181,7 @@ export default async function RootLayout({
                 <NavLink href="/" exact>Home</NavLink>
                 <NavLink href="/standings">Standings</NavLink>
                 <NavLink href="/draft">Draft</NavLink>
+                <NavLink href="/draft/analysis">Report Cards</NavLink>
                 <NavLink href="/lineup">My Teams</NavLink>
                 <NavLink href="/banter">Banter</NavLink>
                 <NavLink href="/news">News</NavLink>

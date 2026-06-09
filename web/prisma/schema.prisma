@@ -59,6 +59,7 @@ model TournamentDraft {
   orderUserIds String[] @default([])
   currentPick  Int      @default(0)
   updatedAt    DateTime @updatedAt
+  analysis     Json?    // AI draft analysis, generated on completion
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
