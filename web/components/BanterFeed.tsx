@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import {
   createPost,
@@ -402,7 +401,7 @@ function ChatComposer({ myId, myName, myColorIdx, onPost, onRefresh }: {
   myName: string;
   myColorIdx: number;
   onPost: (post: PostData) => void;
-  onRefresh: () => void;
+  onRefresh: (posts: PostData[]) => void;
 }) {
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -424,7 +423,12 @@ function ChatComposer({ myId, myName, myColorIdx, onPost, onRefresh }: {
     if (inputRef.current) { inputRef.current.style.height = "auto"; }
     try {
       await createPost(optimistic.text);
-      onRefresh();
+      // Immediately fetch confirmed posts so optimistic gets replaced with real data
+      const res = await fetch("/api/banter/posts", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json() as { posts: PostData[] };
+        onRefresh(data.posts);
+      }
     } catch (err) {
       console.error("Failed to send message:", err);
     } finally {
@@ -725,29 +729,38 @@ export default function BanterFeed({
 }) {
   const [posts, setPosts] = useState(initialPosts);
   const push = usePushNotifications();
-  const router = useRouter();
 
-  // Merge server data: add new posts from server, drop optimistic posts whose
-  // text is now confirmed in server data. Never wipe an unconfirmed optimistic post.
-  useEffect(() => {
+  // Merge fresh server posts while preserving unconfirmed optimistic messages
+  function mergePosts(fresh: PostData[]) {
     setPosts(prev => {
-      const serverTexts = new Set(
-        initialPosts.filter(p => !p.isSystem).map(p => p.text?.trim()).filter(Boolean)
-      );
-      // Keep optimistic posts whose text hasn't appeared on the server yet
+      const freshIds = new Set(fresh.map(p => p.id));
+      const freshTexts = new Set(fresh.filter(p => !p.isSystem).map(p => p.text?.trim()).filter(Boolean));
       const pendingOptimistic = prev.filter(
-        p => p.id.startsWith("opt-") && !serverTexts.has(p.text?.trim())
+        p => p.id.startsWith("opt-") && !freshTexts.has(p.text?.trim()) && !freshIds.has(p.id)
       );
-      return [...pendingOptimistic, ...initialPosts];
+      return [...pendingOptimistic, ...fresh];
     });
+  }
+
+  // Sync from initialPosts (first load / server push)
+  useEffect(() => {
+    mergePosts(initialPosts);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPosts]);
 
-  // Poll for new messages every 15 seconds
-  const routerRef = useRef(router);
-  routerRef.current = router;
+  // Poll /api/banter/posts every 10 seconds — always hits the DB, bypasses RSC cache
   useEffect(() => {
-    const id = setInterval(() => routerRef.current.refresh(), 15_000);
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/banter/posts", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json() as { posts: PostData[] };
+        mergePosts(data.posts);
+      } catch { /* ignore network errors */ }
+    };
+    const id = setInterval(poll, 10_000);
     return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Stable color index for current user
@@ -874,7 +887,7 @@ export default function BanterFeed({
         myName={currentUserName}
         myColorIdx={myColorIdx}
         onPost={handleNewPost}
-        onRefresh={() => router.refresh()}
+        onRefresh={mergePosts}
       />
     </main>
   );

@@ -113,6 +113,10 @@ body {
   min-height: 100vh;
   line-height: 1.45;
 }
+/* Prevent iOS Safari from zooming in when tapping inputs (triggered when font-size < 16px) */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  input, textarea, select { font-size: max(16px, 1em); }
+}
 ::selection { background: var(--grass); color: #fff; }
 
 /* ── Typography ─────────────────────────────────────────── */
