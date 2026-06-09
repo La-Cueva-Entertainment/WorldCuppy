@@ -396,12 +396,13 @@ function ReplyThread({ postId, initialReplies, replyCount, myId, myName, myColor
 
 // ── Chat Composer ───────────────────────────────────────────────────────────
 
-function ChatComposer({ myId, myName, myColorIdx, onPost, onRefresh }: {
+function ChatComposer({ myId, myName, myColorIdx, onPost, onRefresh, sendingTexts }: {
   myId: string;
   myName: string;
   myColorIdx: number;
   onPost: (post: PostData) => void;
   onRefresh: (posts: PostData[]) => void;
+  sendingTexts: React.RefObject<Set<string>>;
 }) {
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -410,20 +411,23 @@ function ChatComposer({ myId, myName, myColorIdx, onPost, onRefresh }: {
   async function submit() {
     if (!text.trim() || submitting) return;
     setSubmitting(true);
+    const trimmed = text.trim();
     const optimistic: PostData = {
       id: `opt-${Date.now()}`,
       authorId: myId, authorName: myName, colorIdx: myColorIdx,
-      text: text.trim(), imageUrl: null, gifUrl: null,
+      text: trimmed, imageUrl: null, gifUrl: null,
       isSystem: false, systemType: null, systemData: null,
       createdAt: new Date().toISOString(),
       reactions: [], replyCount: 0, replies: [],
     };
+    // Register as in-flight BEFORE adding optimistically
+    sendingTexts.current.add(trimmed);
     onPost(optimistic);
     setText("");
     if (inputRef.current) { inputRef.current.style.height = "auto"; }
     try {
-      await createPost(optimistic.text);
-      // Immediately fetch confirmed posts so optimistic gets replaced with real data
+      await createPost(trimmed);
+      // Fetch confirmed posts — server action has already written to DB
       const res = await fetch("/api/banter/posts", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json() as { posts: PostData[] };
@@ -431,6 +435,8 @@ function ChatComposer({ myId, myName, myColorIdx, onPost, onRefresh }: {
       }
     } catch (err) {
       console.error("Failed to send message:", err);
+      // Remove from sending so the optimistic post gets cleaned up on next poll
+      sendingTexts.current.delete(trimmed);
     } finally {
       setSubmitting(false);
     }
@@ -729,26 +735,29 @@ export default function BanterFeed({
 }) {
   const [posts, setPosts] = useState(initialPosts);
   const push = usePushNotifications();
+  // Track texts currently being sent so we can keep them visible while polling
+  const sendingTexts = useRef<Set<string>>(new Set());
 
-  // Stable merge function: keeps unconfirmed optimistic posts, replaces with server data
-  const mergePosts = useCallback((fresh: PostData[]) => {
+  function mergePosts(fresh: PostData[]) {
+    const freshTexts = new Set(
+      fresh.filter(p => !p.isSystem).map(p => p.text?.trim())
+    );
+    // Remove confirmed texts from sendingTexts
+    for (const t of sendingTexts.current) {
+      if (freshTexts.has(t)) sendingTexts.current.delete(t);
+    }
     setPosts(prev => {
-      const freshIds = new Set(fresh.map(p => p.id));
-      const freshTexts = new Set(
-        fresh.filter(p => !p.isSystem).map(p => p.text?.trim()).filter(Boolean) as string[]
+      // Keep only optimistic posts still waiting to be confirmed
+      const pending = prev.filter(
+        p => p.id.startsWith("opt-") && sendingTexts.current.has(p.text?.trim() ?? "")
       );
-      const pendingOptimistic = prev.filter(
-        p => p.id.startsWith("opt-") && !freshIds.has(p.id) && !freshTexts.has(p.text?.trim() ?? "")
-      );
-      return [...pendingOptimistic, ...fresh];
+      return [...pending, ...fresh];
     });
-  }, []);
+  }
 
-  // Sequential polling — next fetch only starts after the previous one finishes,
-  // so stale responses can never overwrite newer ones.
+  // Poll immediately on mount, then every 8 seconds
   useEffect(() => {
     let cancelled = false;
-
     async function poll() {
       if (cancelled) return;
       try {
@@ -757,13 +766,13 @@ export default function BanterFeed({
           const data = await res.json() as { posts: PostData[] };
           if (!cancelled) mergePosts(data.posts);
         }
-      } catch { /* ignore network errors */ }
-      if (!cancelled) setTimeout(poll, 10_000);
+      } catch { /* network error — try again next cycle */ }
+      if (!cancelled) setTimeout(poll, 8_000);
     }
-
-    const t = setTimeout(poll, 10_000);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [mergePosts]);
+    poll(); // immediate first fetch
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Stable color index for current user
   const myColorIdx = useCallback(() => {
@@ -890,6 +899,7 @@ export default function BanterFeed({
         myColorIdx={myColorIdx}
         onPost={handleNewPost}
         onRefresh={mergePosts}
+        sendingTexts={sendingTexts}
       />
     </main>
   );
