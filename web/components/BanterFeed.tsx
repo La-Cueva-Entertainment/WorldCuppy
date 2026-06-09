@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import {
   createPost,
@@ -396,11 +397,12 @@ function ReplyThread({ postId, initialReplies, replyCount, myId, myName, myColor
 
 // ── Chat Composer ───────────────────────────────────────────────────────────
 
-function ChatComposer({ myId, myName, myColorIdx, onPost }: {
+function ChatComposer({ myId, myName, myColorIdx, onPost, onRefresh }: {
   myId: string;
   myName: string;
   myColorIdx: number;
   onPost: (post: PostData) => void;
+  onRefresh: () => void;
 }) {
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -420,8 +422,14 @@ function ChatComposer({ myId, myName, myColorIdx, onPost }: {
     onPost(optimistic);
     setText("");
     if (inputRef.current) { inputRef.current.style.height = "auto"; }
-    await createPost(optimistic.text);
-    setSubmitting(false);
+    try {
+      await createPost(optimistic.text);
+      onRefresh();
+    } catch (err) {
+      console.error("Failed to send message:", err);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function autoResize() {
@@ -449,7 +457,7 @@ function ChatComposer({ myId, myName, myColorIdx, onPost }: {
           flex: 1, resize: "none", border: "1px solid var(--line)", borderRadius: 20,
           padding: "9px 14px", background: "var(--surface)", color: "var(--ink)",
           fontSize: 14, fontFamily: "inherit", outline: "none", minHeight: 38,
-          lineHeight: 1.4, overflowY: "hidden",
+          lineHeight: 1.4, overflowY: "hidden", minWidth: 0,
         }}
       />
       <button
@@ -719,6 +727,7 @@ export default function BanterFeed({
   draftInfo,
   onlineUsers = [],
 }: {
+
   initialPosts: PostData[];
   currentUserId: string;
   currentUserName: string;
@@ -727,6 +736,18 @@ export default function BanterFeed({
 }) {
   const [posts, setPosts] = useState(initialPosts);
   const push = usePushNotifications();
+  const router = useRouter();
+
+  // Sync server data into local state when Next.js re-fetches (router.refresh)
+  useEffect(() => {
+    setPosts(initialPosts);
+  }, [initialPosts]);
+
+  // Poll for new messages every 15 seconds
+  useEffect(() => {
+    const id = setInterval(() => router.refresh(), 15_000);
+    return () => clearInterval(id);
+  }, [router]);
 
   // Stable color index for current user
   const myColorIdx = useCallback(() => {
@@ -765,7 +786,7 @@ export default function BanterFeed({
     .slice(0, 3);
 
   return (
-    <main style={{ display: "flex", flexDirection: "column", height: "calc(100vh - var(--nav-h))", overflow: "hidden" }}>
+    <main style={{ display: "flex", flexDirection: "column", height: "calc(100vh - var(--nav-h))", overflow: "hidden", width: "100%", maxWidth: "100vw" }}>
 
       {/* ── Top bar ─────────────────────────────────────────── */}
       <div style={{ borderBottom: "1px solid var(--line)", padding: "10px clamp(12px,3vw,24px)", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
@@ -828,7 +849,7 @@ export default function BanterFeed({
       )}
 
       {/* ── Messages ─────────────────────────────────────────── */}
-      <div className="chat-scroll" style={{ flex: 1, overflowY: "auto", padding: "16px clamp(12px,3vw,24px)", display: "flex", flexDirection: "column", gap: 2 }}>
+      <div className="chat-scroll" style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "16px clamp(12px,3vw,24px)", display: "flex", flexDirection: "column", gap: 2 }}>
         {visiblePosts.length === 0 && (
           <div style={{ textAlign: "center", color: "var(--ink-faint)", fontSize: 14, marginTop: 40 }}>
             No messages yet. Drop a hot take 🔥
@@ -852,6 +873,7 @@ export default function BanterFeed({
         myName={currentUserName}
         myColorIdx={myColorIdx}
         onPost={handleNewPost}
+        onRefresh={() => router.refresh()}
       />
     </main>
   );
