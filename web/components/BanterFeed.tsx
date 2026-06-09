@@ -597,17 +597,6 @@ function ChatMessage({ post, myId, myName, myColorIdx, onReaction }: {
   );
 }
 
-// ── Post Card (kept for compatibility but replaced by ChatMessage above) ────
-
-function PostComposer({ myId, myName, myColorIdx, onPost }: {
-  myId: string;
-  myName: string;
-  myColorIdx: number;
-  onPost: (post: PostData) => void;
-}) {
-  return <ChatComposer myId={myId} myName={myName} myColorIdx={myColorIdx} onPost={onPost} />;
-}
-
 // ── Post Card ───────────────────────────────────────────────────────────────
 
 function PostCard({ post, myId, myName, myColorIdx, onReaction }: {
