@@ -29,6 +29,7 @@ model User {
   banterReactions      BanterReaction[]
   banterReplies        BanterReply[]
   banterReplyReactions BanterReplyReaction[]
+  pushSubscriptions    PushSubscription[]
 }
 
 model Tournament {
@@ -246,4 +247,16 @@ model TeamStagePoints {
 
   @@id([teamCode, stageKey])
   @@index([stageKey])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

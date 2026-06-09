@@ -11,6 +11,61 @@ import {
   toggleReplyReaction,
 } from "@/app/banter/actions";
 
+// ── Push notification hook ─────────────────────────────────────────────────
+
+function usePushNotifications() {
+  const [state, setState] = useState<"unsupported" | "default" | "granted" | "denied" | "loading">("unsupported");
+  const [sub, setSub] = useState<PushSubscription | null>(null);
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    setState(Notification.permission === "granted" ? "granted" : Notification.permission === "denied" ? "denied" : "default");
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.pushManager.getSubscription().then((s) => {
+        setSub(s);
+        if (s) setState("granted");
+      });
+    });
+  }, []);
+
+  async function subscribe() {
+    if (!("serviceWorker" in navigator)) return;
+    setState("loading");
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") { setState("denied"); return; }
+      const s = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      });
+      setSub(s);
+      const json = s.toJSON();
+      await fetch("/api/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: s.endpoint, keys: json.keys }),
+      });
+      setState("granted");
+    } catch { setState("default"); }
+  }
+
+  async function unsubscribe() {
+    if (!sub) return;
+    setState("loading");
+    await fetch("/api/push", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint }),
+    });
+    await sub.unsubscribe();
+    setSub(null);
+    setState("default");
+  }
+
+  return { state, subscribe, unsubscribe };
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type ReactionData = { id: string; emoji: string; userId: string };
@@ -339,7 +394,202 @@ function ReplyThread({ postId, initialReplies, replyCount, myId, myName, myColor
   );
 }
 
-// ── Post Composer ───────────────────────────────────────────────────────────
+// ── Chat Composer ───────────────────────────────────────────────────────────
+
+function ChatComposer({ myId, myName, myColorIdx, onPost }: {
+  myId: string;
+  myName: string;
+  myColorIdx: number;
+  onPost: (post: PostData) => void;
+}) {
+  const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  async function submit() {
+    if (!text.trim() || submitting) return;
+    setSubmitting(true);
+    const optimistic: PostData = {
+      id: `opt-${Date.now()}`,
+      authorId: myId, authorName: myName, colorIdx: myColorIdx,
+      text: text.trim(), imageUrl: null, gifUrl: null,
+      isSystem: false, systemType: null, systemData: null,
+      createdAt: new Date().toISOString(),
+      reactions: [], replyCount: 0, replies: [],
+    };
+    onPost(optimistic);
+    setText("");
+    if (inputRef.current) { inputRef.current.style.height = "auto"; }
+    await createPost(optimistic.text);
+    setSubmitting(false);
+  }
+
+  function autoResize() {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }
+
+  return (
+    <div style={{
+      borderTop: "1px solid var(--line)", padding: "10px clamp(12px,3vw,24px)",
+      display: "flex", gap: 10, alignItems: "flex-end", flexShrink: 0,
+      background: "var(--paper)",
+    }}>
+      <Avatar name={myName} colorIdx={myColorIdx} size="sm" />
+      <textarea
+        ref={inputRef}
+        rows={1}
+        value={text}
+        onChange={(e) => { setText(e.target.value); autoResize(); }}
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
+        placeholder="Say something… 🔥"
+        style={{
+          flex: 1, resize: "none", border: "1px solid var(--line)", borderRadius: 20,
+          padding: "9px 14px", background: "var(--surface)", color: "var(--ink)",
+          fontSize: 14, fontFamily: "inherit", outline: "none", minHeight: 38,
+          lineHeight: 1.4, overflowY: "hidden",
+        }}
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={submitting || !text.trim()}
+        style={{
+          width: 38, height: 38, borderRadius: "50%", border: "none", flexShrink: 0,
+          background: text.trim() ? "var(--grass)" : "var(--surface-2)",
+          color: text.trim() ? "#fff" : "var(--ink-faint)",
+          cursor: text.trim() ? "pointer" : "default",
+          display: "flex", alignItems: "center", justifyContent: "center", transition: ".15s",
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// ── Chat Message ────────────────────────────────────────────────────────────
+
+function ChatMessage({ post, myId, myName, myColorIdx, onReaction }: {
+  post: PostData;
+  myId: string;
+  myName: string;
+  myColorIdx: number;
+  onReaction: (postId: string, emoji: string) => void;
+}) {
+  const [repliesOpen, setRepliesOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const reactBtnRef = useRef<HTMLButtonElement>(null);
+  const isMe = post.authorId === myId;
+  const grouped = groupReactions(post.reactions, myId);
+
+  // System messages — compact inline
+  if (post.isSystem) {
+    const d = post.systemData ?? {};
+    return (
+      <div style={{ display: "flex", justifyContent: "center", padding: "6px 0" }}>
+        <span style={{
+          fontSize: 12, color: "var(--ink-faint)", background: "var(--surface-2)",
+          border: "1px solid var(--line-soft)", borderRadius: 999, padding: "3px 12px",
+        }}>
+          {post.systemType === "pick"
+            ? `⚽ ${post.authorName} drafted ${d.teamCode ?? "a team"}`
+            : `🏟️ ${d.homeTeam} ${d.homeScore}–${d.awayScore} ${d.awayTeam}${d.earnerCents && Number(d.earnerCents) > 0 ? ` · $${(Number(d.earnerCents)/100).toFixed(2)} earned` : ""}`
+          }
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: isMe ? "flex-end" : "flex-start", gap: 1 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, maxWidth: "78%", flexDirection: isMe ? "row-reverse" : "row" }}>
+        {!isMe && <Avatar name={post.authorName} colorIdx={post.colorIdx} size="sm" />}
+        <div style={{ minWidth: 0 }}>
+          {/* Name + time */}
+          <div style={{
+            display: "flex", gap: 6, alignItems: "baseline", marginBottom: 3,
+            justifyContent: isMe ? "flex-end" : "flex-start",
+          }}>
+            {!isMe && (
+              <span style={{ fontFamily: "var(--font-archivo),Archivo,sans-serif", fontWeight: 800, fontSize: 12 }} className={`m${post.colorIdx}`}>
+                {post.authorName ?? "?"}
+              </span>
+            )}
+            <RelTime iso={post.createdAt} style={{ fontSize: 10, color: "var(--ink-faint)" }} />
+          </div>
+
+          {/* Bubble */}
+          <div style={{ position: "relative" }}>
+            <div style={{
+              background: isMe ? "var(--grass)" : "var(--surface)",
+              color: isMe ? "#fff" : "var(--ink)",
+              border: isMe ? "none" : "1px solid var(--line)",
+              borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+              padding: "9px 14px",
+              fontSize: 14, lineHeight: 1.5, wordBreak: "break-word", whiteSpace: "pre-wrap",
+            }}>
+              {post.text}
+              {post.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={post.imageUrl} alt="" style={{ display: "block", marginTop: 8, borderRadius: 10, maxWidth: "100%", maxHeight: 220, objectFit: "cover" }} />
+              )}
+              {post.gifUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={post.gifUrl} alt="" style={{ display: "block", marginTop: 8, borderRadius: 10, maxWidth: "100%", maxHeight: 180, objectFit: "cover" }} />
+              )}
+            </div>
+          </div>
+
+          {/* Reaction row + add button */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4, justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "center" }}>
+            {grouped.map(({ emoji, count, mine }) => (
+              <button key={emoji} type="button" onClick={() => onReaction(post.id, emoji)}
+                className={`banter-rxn${mine ? " mine" : ""}`}
+                style={{ fontSize: 12, height: 24, padding: "0 7px" }}>
+                <span>{emoji}</span>
+                <span className="banter-rxn-ct">{count}</span>
+              </button>
+            ))}
+            <button ref={reactBtnRef} type="button" onClick={() => setPickerOpen(p => !p)}
+              className="banter-rxn-add" title="React" style={{ height: 24, width: 24, fontSize: 13 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+              </svg>
+            </button>
+            {pickerOpen && (
+              <EmojiPicker anchorRef={reactBtnRef} onSelect={(e) => { onReaction(post.id, e); setPickerOpen(false); }} onClose={() => setPickerOpen(false)} />
+            )}
+            <button type="button" onClick={() => setRepliesOpen(p => !p)}
+              style={{ fontSize: 11, color: "var(--ink-faint)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}>
+              {post.replyCount > 0 ? `${post.replyCount} ${post.replyCount === 1 ? "reply" : "replies"}` : "reply"}
+            </button>
+          </div>
+
+          {/* Thread */}
+          {repliesOpen && (
+            <div style={{ marginTop: 6, paddingLeft: isMe ? 0 : 4, borderLeft: isMe ? "none" : "2px solid var(--line)", paddingRight: isMe ? 4 : 0, borderRight: isMe ? "2px solid var(--line)" : "none" }}>
+              <ReplyThread
+                postId={post.id}
+                initialReplies={post.replies}
+                replyCount={post.replyCount}
+                myId={myId}
+                myName={myName}
+                myColorIdx={myColorIdx}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Post Card (kept for compatibility but replaced by ChatMessage above) ────
 
 function PostComposer({ myId, myName, myColorIdx, onPost }: {
   myId: string;
@@ -347,69 +597,7 @@ function PostComposer({ myId, myName, myColorIdx, onPost }: {
   myColorIdx: number;
   onPost: (post: PostData) => void;
 }) {
-  const [text, setText] = useState("");
-  const [expanded, setExpanded] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const taRef = useRef<HTMLTextAreaElement>(null);
-
-  function autoResize() {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = ta.scrollHeight + "px";
-  }
-
-  async function submit() {
-    if (!text.trim() || submitting) return;
-    setSubmitting(true);
-    const optimistic: PostData = {
-      id: `opt-${Date.now()}`,
-      authorId: myId,
-      authorName: myName,
-      colorIdx: myColorIdx,
-      text: text.trim(),
-      imageUrl: null,
-      gifUrl: null,
-      isSystem: false,
-      systemType: null,
-      systemData: null,
-      createdAt: new Date().toISOString(),
-      reactions: [],
-      replyCount: 0,
-      replies: [],
-    };
-    onPost(optimistic);
-    setText("");
-    if (taRef.current) { taRef.current.style.height = "auto"; }
-    setExpanded(false);
-    await createPost(optimistic.text);
-    setSubmitting(false);
-  }
-
-  return (
-    <div className="banter-composer">
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-        <Avatar name={myName} colorIdx={myColorIdx} size="lg" />
-        <textarea
-          ref={taRef}
-          className="banter-comp-ta"
-          placeholder="Drop a hot take… 🔥"
-          rows={2}
-          value={text}
-          onChange={(e) => { setText(e.target.value); autoResize(); }}
-          onFocus={() => setExpanded(true)}
-        />
-      </div>
-      {expanded && (
-        <div className="banter-comp-actions">
-          <div style={{ flex: 1 }} />
-          <button type="button" onClick={submit} disabled={submitting || !text.trim()} className="btn btn-primary btn-sm">
-            Post it
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  return <ChatComposer myId={myId} myName={myName} myColorIdx={myColorIdx} onPost={onPost} />;
 }
 
 // ── Post Card ───────────────────────────────────────────────────────────────
@@ -538,6 +726,7 @@ export default function BanterFeed({
   onlineUsers?: OnlineUser[];
 }) {
   const [posts, setPosts] = useState(initialPosts);
+  const push = usePushNotifications();
 
   // Stable color index for current user
   const myColorIdx = useCallback(() => {
@@ -576,157 +765,94 @@ export default function BanterFeed({
     .slice(0, 3);
 
   return (
-    <main className="page">
-      <div className="wrap">
-        {/* Header */}
-        <div className="between" style={{ marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
-          <div>
-            <div className="kicker grass">The group chat, but better</div>
-            <h1 style={{ fontSize: "clamp(28px,4vw,38px)", marginTop: 4 }}>Banter</h1>
-          </div>
-          {onlineUsers.length > 0 && (
-            <span className="badge hot" style={{ height: 28, fontSize: 13 }}>
-              <span className="live-dot" />{" "}{onlineUsers.length} manager{onlineUsers.length !== 1 ? "s" : ""} online
-            </span>
-          )}
-        </div>
+    <main style={{ display: "flex", flexDirection: "column", height: "calc(100vh - var(--nav-h))", overflow: "hidden" }}>
 
-        <div className="banter-grid">
-          {/* ── Feed column ── */}
-          <div>
-            {/* Mobile-only compact strip: online users + hot take */}
-            {(onlineUsers.length > 0 || hotTakes.length > 0) && (
-              <div className="banter-mobile-strip">
-                {onlineUsers.length > 0 && (
-                  <span className="banter-mobile-pill">
-                    <span className="dot" />
-                    <span style={{ fontWeight: 700, fontSize: 13 }}>{onlineUsers.length} online</span>
-                    {onlineUsers.slice(0, 3).map((u) => (
-                      <span key={u.id} style={{ color: "var(--ink-soft)", fontSize: 12 }}>
-                        {u.isMe ? "you" : (u.name?.split(" ")[0] ?? "?")}
-                      </span>
-                    ))}
-                  </span>
-                )}
-                {hotTakes.slice(0, 2).map((p) => (
-                  <span key={p.id} className="banter-mobile-pill" style={{ maxWidth: 220 }}>
-                    <span style={{ flexShrink: 0 }}>{p.reactions[0]?.emoji ?? "🔥"}</span>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", color: "var(--ink-soft)", fontSize: 12 }}>
-                      {p.text.slice(0, 40)}{p.text.length > 40 ? "…" : ""}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Composer */}
-            <PostComposer
-              myId={currentUserId}
-              myName={currentUserName}
-              myColorIdx={myColorIdx}
-              onPost={handleNewPost}
-            />
-
-            {/* Feed */}
-            {visiblePosts.length === 0 ? (
-              <div className="card card-pad" style={{ textAlign: "center", color: "var(--ink-faint)", fontSize: 14 }}>
-                No posts yet. Be the first to drop a hot take 🔥
-              </div>
-            ) : (
-              visiblePosts.map((p) => (
-                <PostCard
-                  key={p.id}
-                  post={p}
-                  myId={currentUserId}
-                  myName={currentUserName}
-                  myColorIdx={myColorIdx}
-                  onReaction={handleReaction}
-                />
-              ))
-            )}
-          </div>
-
-          {/* ── Sidebar (desktop only, hidden on mobile via CSS) ── */}
-          <aside className="banter-sidebar-desktop" style={{ display: "grid", gap: 18, position: "sticky", top: 80, alignSelf: "start" }}>
-            {/* Top hot takes */}
-            <section className="card">
-              <div className="card-pad" style={{ paddingBottom: 6 }}>
-                <h2 style={{ fontSize: 18, marginBottom: 2 }}>🏆 Top hot takes</h2>
-                <div className="tag-soft">Most reacted this week</div>
-              </div>
-              {hotTakes.length === 0 ? (
-                <div style={{ padding: "14px 18px", fontSize: 13, color: "var(--ink-faint)" }}>No takes yet. Start talking.</div>
-              ) : (
-                hotTakes.map((p) => (
-                  <div key={p.id} className="banter-hot-take">
-                    <span style={{ fontSize: 22, flexShrink: 0, marginTop: 2 }}>
-                      {p.reactions[0]?.emoji ?? "🔥"}
-                    </span>
-                    <div>
-                      <div style={{ fontSize: 14, lineHeight: 1.4 }}>&ldquo;{p.text.slice(0, 90)}{p.text.length > 90 ? "…" : ""}&rdquo;</div>
-                      <div style={{ fontSize: 12, color: "var(--ink-faint)", marginTop: 3 }}>
-                        {p.authorName} · {p.reactions.length} reaction{p.reactions.length !== 1 ? "s" : ""}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </section>
-
-            {/* Active now — real presence from heartbeat */}
+      {/* ── Top bar ─────────────────────────────────────────── */}
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "10px clamp(12px,3vw,24px)", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: "var(--font-archivo),Archivo,sans-serif", fontWeight: 900, fontSize: 20 }}>Banter</span>
             {onlineUsers.length > 0 && (
-              <section className="card card-pad">
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                  <h2 style={{ fontSize: 17, flex: 1 }}>Active now</h2>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--grass-deep)", fontWeight: 700 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--grass)", display: "inline-block", animation: "blink 1.6s ease-in-out infinite" }} />
-                    {onlineUsers.length} online
-                  </span>
-                </div>
-                <div>
-                  {onlineUsers.map((u) => (
-                    <div key={u.id} className="banter-active-row">
-                      <div style={{ position: "relative", flexShrink: 0 }}>
-                        <Avatar name={u.name} colorIdx={u.colorIdx} size="sm" />
-                        <span style={{
-                          position: "absolute", bottom: 0, right: 0,
-                          width: 8, height: 8, borderRadius: "50%",
-                          background: "var(--grass)",
-                          border: "1.5px solid var(--surface)",
-                        }} />
-                      </div>
-                      <span style={{ flex: 1, fontWeight: 700, fontSize: 14 }}>
-                        {u.name ?? "?"}
-                        {u.isMe && <span style={{ fontWeight: 400, color: "var(--ink-faint)", fontSize: 12 }}> (you)</span>}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </section>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--grass-deep)", fontWeight: 700 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--grass)", display: "inline-block" }} />
+                {onlineUsers.map((u) => u.isMe ? "you" : (u.name?.split(" ")[0] ?? "?")).join(", ")}
+              </span>
             )}
-
-            {/* Draft night card */}
-            {draftInfo && (draftInfo.status === "upcoming" || draftInfo.status === "draft") && (
-              <section className="card card-pad" style={{ background: "var(--gold-soft)", borderColor: "var(--gold)" }}>
-                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontSize: 22 }}>📢</span>
-                  <div>
-                    <div style={{ fontFamily: "var(--font-archivo), Archivo, sans-serif", fontWeight: 800, fontSize: 15 }}>
-                      {draftInfo.name} {draftInfo.year}
-                    </div>
-                    <div className="tag-soft">
-                      {draftInfo.status === "draft" ? "Draft is open now!" : `Draft ${new Date(draftInfo.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
-                    </div>
-                  </div>
-                </div>
-                <Link href="/draft" className="btn btn-gold btn-sm btn-block" style={{ marginTop: 4 }}>
-                  Open the draft →
-                </Link>
-              </section>
-            )}
-          </aside>
+          </div>
         </div>
+        {push.state !== "unsupported" && push.state !== "denied" && (
+          <button
+            type="button"
+            onClick={push.state === "granted" ? push.unsubscribe : push.subscribe}
+            disabled={push.state === "loading"}
+            title={push.state === "granted" ? "Turn off notifications" : "Get notified of new posts"}
+            style={{
+              display: "flex", alignItems: "center", gap: 5, height: 28, padding: "0 10px",
+              borderRadius: 999, border: "1px solid var(--line)",
+              background: push.state === "granted" ? "var(--grass-soft)" : "transparent",
+              color: push.state === "granted" ? "var(--grass-deep)" : "var(--ink-faint)",
+              fontFamily: "var(--font-archivo),Archivo,sans-serif", fontWeight: 700, fontSize: 11,
+              cursor: push.state === "loading" ? "wait" : "pointer",
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill={push.state === "granted" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            {push.state === "granted" ? "On" : push.state === "loading" ? "…" : "Notify me"}
+          </button>
+        )}
+        {draftInfo && (draftInfo.status === "upcoming" || draftInfo.status === "draft") && (
+          <Link href="/draft" className="btn btn-gold btn-sm">Draft →</Link>
+        )}
       </div>
+
+      {/* ── Hot takes strip ─────────────────────────────────── */}
+      {hotTakes.length > 0 && (
+        <div style={{ borderBottom: "1px solid var(--line-soft)", padding: "8px clamp(12px,3vw,24px)", display: "flex", gap: 8, overflowX: "auto", flexShrink: 0, scrollbarWidth: "none" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink-faint)", flexShrink: 0, alignSelf: "center" }}>🔥 Top takes</span>
+          {hotTakes.map((p) => (
+            <span key={p.id} style={{
+              display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0,
+              background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 999,
+              padding: "3px 10px 3px 7px", fontSize: 12, maxWidth: 220,
+            }}>
+              <span>{p.reactions[0]?.emoji ?? "🔥"}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ink-soft)" }}>
+                {p.text.slice(0, 45)}{p.text.length > 45 ? "…" : ""}
+              </span>
+              <span style={{ color: "var(--ink-faint)", fontSize: 11, flexShrink: 0 }}>{p.reactions.length}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ── Messages ─────────────────────────────────────────── */}
+      <div className="chat-scroll" style={{ flex: 1, overflowY: "auto", padding: "16px clamp(12px,3vw,24px)", display: "flex", flexDirection: "column", gap: 2 }}>
+        {visiblePosts.length === 0 && (
+          <div style={{ textAlign: "center", color: "var(--ink-faint)", fontSize: 14, marginTop: 40 }}>
+            No messages yet. Drop a hot take 🔥
+          </div>
+        )}
+        {[...visiblePosts].reverse().map((p) => (
+          <ChatMessage
+            key={p.id}
+            post={p}
+            myId={currentUserId}
+            myName={currentUserName}
+            myColorIdx={myColorIdx}
+            onReaction={handleReaction}
+          />
+        ))}
+      </div>
+
+      {/* ── Composer ─────────────────────────────────────────── */}
+      <ChatComposer
+        myId={currentUserId}
+        myName={currentUserName}
+        myColorIdx={myColorIdx}
+        onPost={handleNewPost}
+      />
     </main>
   );
 }

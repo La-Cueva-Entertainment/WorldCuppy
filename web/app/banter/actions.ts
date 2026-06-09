@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sendPushToAll } from "@/lib/push";
 
 async function requireUser() {
   const session = await getServerSession(authOptions);
@@ -46,6 +47,22 @@ export async function createPost(text: string, imageUrl?: string, gifUrl?: strin
       tournamentId: tournamentId ?? null,
     },
   });
+
+  // Push notification to everyone else — fire-and-forget
+  const author = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
+  const displayName = author?.name ?? "Someone";
+  sendPushToAll(
+    {
+      title: `${displayName} posted in Banter`,
+      body: text.trim().slice(0, 100),
+      url: "/banter",
+      tag: "banter-post",
+    },
+    userId
+  ).catch(() => {});
 
   revalidatePath("/banter");
 }

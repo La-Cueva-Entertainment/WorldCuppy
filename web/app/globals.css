@@ -712,160 +712,58 @@ html:not(.dark) .pitch-panel {
 .slot-empty .sbadge { font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 20px; background: var(--gold); color: #000; }
 .slot-empty .scta { font-size: 14px; font-weight: 600; color: var(--grass-deep); }
 
-/* ── Banter page ─────────────────────────────────────────── */
-.banter-grid { display: grid; grid-template-columns: 1fr 300px; gap: 22px; align-items: start; }
-@media (max-width: 920px) { .banter-grid { grid-template-columns: 1fr; } }
-@media (max-width: 920px) { .banter-grid aside { position: static !important; } }
-/* Prevent any child from blowing out the column width */
-.banter-grid > div, .banter-post { min-width: 0; overflow-wrap: break-word; word-break: break-word; }
+/* ── Banter chat ──────────────────────────────────────────── */
+/* Full-height chat layout — override page padding */
+.page:has(.chat-scroll) { padding: 0 !important; }
 
-/* Composer */
-.banter-composer {
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
-  padding: 14px 16px; margin-bottom: 18px; box-shadow: var(--shadow-sm);
-}
-.banter-comp-ta {
-  flex: 1; border: none; background: transparent; outline: none; resize: none;
-  min-height: 44px; max-height: 180px; width: 100%; min-width: 0;
-  font-family: var(--font-hanken), 'Hanken Grotesk', sans-serif; font-size: 15px;
-  color: var(--ink); line-height: 1.4; caret-color: var(--grass);
-}
-.banter-comp-ta::placeholder { color: var(--ink-faint); }
-.banter-comp-actions {
-  display: flex; gap: 8px; align-items: center;
-  padding-top: 10px; border-top: 1px solid var(--line-soft); margin-top: 10px;
-}
-.banter-comp-btn {
-  font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700; font-size: 13px;
-  cursor: pointer; height: 34px; padding: 0 14px; border-radius: 9px;
-  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-soft);
-  display: inline-flex; align-items: center; gap: 6px; transition: .12s;
-}
-.banter-comp-btn:hover { border-color: var(--ink-faint); color: var(--ink); }
-
-/* Filter tabs */
-.banter-tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
-.banter-tab {
-  font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700; font-size: 13.5px;
-  cursor: pointer; padding: 7px 14px; border-radius: 10px;
-  border: 1px solid transparent; background: transparent; color: var(--ink-soft); transition: .12s;
-}
-.banter-tab:hover { background: var(--surface-2); color: var(--ink); }
-.banter-tab.on { background: var(--surface); border-color: var(--line); color: var(--ink); box-shadow: var(--shadow-sm); }
-
-/* Post card */
-.banter-post {
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm); margin-bottom: 14px; overflow: hidden;
-}
-.banter-post-system { background: var(--surface-2); border-color: var(--line-soft); }
-.banter-sys-card {
-  display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-  font-size: 14px;
-}
-.banter-gif-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 800;
-  font-size: 10px; letter-spacing: .08em; color: var(--ink);
-  background: var(--gold-soft); border: 1.5px solid var(--gold);
-  padding: 2px 7px; border-radius: 5px; margin-top: 4px;
-}
+.chat-scroll { overscroll-behavior: contain; }
+.chat-scroll::-webkit-scrollbar { width: 5px; }
+.chat-scroll::-webkit-scrollbar-track { background: transparent; }
+.chat-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
 
 /* Reactions */
 .banter-rxn {
-  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px;
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px;
   border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface);
-  font-size: 14px; cursor: pointer; transition: .12s; user-select: none;
+  font-size: 13px; cursor: pointer; transition: .12s; user-select: none;
 }
-.banter-rxn:hover { border-color: var(--ink-faint); background: var(--surface-2); transform: scale(1.06); }
+.banter-rxn:hover { border-color: var(--ink-faint); background: var(--surface-2); }
 .banter-rxn.mine { border-color: var(--grass); background: var(--grass-soft); }
-.banter-rxn-ct { font-family: var(--font-spline), 'Spline Sans Mono', monospace; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.banter-rxn-ct { font-family: var(--font-spline), 'Spline Sans Mono', monospace; font-size: 11px; font-weight: 600; color: var(--ink-soft); }
 .banter-rxn.mine .banter-rxn-ct { color: var(--grass-deep); }
 .banter-rxn-add {
-  width: 30px; height: 30px; border-radius: 50%; border: 1.5px dashed var(--line);
-  background: transparent; display: grid; place-items: center; font-size: 15px;
+  width: 24px; height: 24px; border-radius: 50%; border: 1.5px dashed var(--line);
+  background: transparent; display: grid; place-items: center;
   cursor: pointer; color: var(--ink-faint); transition: .12s; flex: none;
 }
 .banter-rxn-add:hover { border-color: var(--ink-faint); color: var(--ink); background: var(--surface-2); }
 
-/* Reply toggle button */
-.banter-reply-btn {
-  font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700; font-size: 13px;
-  cursor: pointer; height: 30px; padding: 0 13px; border-radius: 8px;
-  border: none; background: transparent; color: var(--ink-faint); transition: .12s;
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.banter-reply-btn:hover { background: var(--surface-2); color: var(--ink); }
-
-/* Reply thread */
-.banter-replies { border-top: 1px solid var(--line-soft); background: var(--surface-2); }
-.banter-reply { display: flex; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--line-soft); min-width: 0; }
-.banter-reply:last-of-type { border-bottom: 0; }
+/* Reply thread (indented below bubble) */
+.banter-reply { display: flex; gap: 8px; padding: 6px 0; min-width: 0; }
 .banter-mini-rxn {
-  font-size: 13px; cursor: pointer; padding: 3px 8px; border-radius: 999px;
+  font-size: 12px; cursor: pointer; padding: 2px 7px; border-radius: 999px;
   border: 1px solid var(--line-soft); background: var(--surface); transition: .1s;
 }
-.banter-mini-rxn:hover { border-color: var(--ink-faint); transform: scale(1.08); }
+.banter-mini-rxn:hover { border-color: var(--ink-faint); }
 .banter-mini-rxn.mine { border-color: var(--grass); background: var(--grass-soft); }
 .banter-load-more {
-  width: 100%; padding: 10px; border: none; background: transparent;
+  width: 100%; padding: 8px; border: none; background: transparent;
   font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700;
-  font-size: 13px; color: var(--grass-deep); cursor: pointer; text-align: center; transition: .12s;
+  font-size: 12px; color: var(--grass-deep); cursor: pointer; text-align: center;
 }
-.banter-load-more:hover { background: var(--line-soft); }
-
-/* Reply composer */
 .banter-reply-compose {
-  display: flex; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line);
-  background: var(--surface); align-items: center;
+  display: flex; gap: 8px; padding: 8px 0 4px; align-items: center;
 }
 .banter-reply-input {
-  flex: 1; border: 1px solid var(--line); border-radius: 999px; height: 34px; padding: 0 14px;
-  font-family: var(--font-hanken), 'Hanken Grotesk', sans-serif; font-size: 13.5px;
-  color: var(--ink); background: var(--surface); outline: none; transition: .15s; min-width: 0;
+  flex: 1; border: 1px solid var(--line); border-radius: 999px; height: 32px; padding: 0 12px;
+  font-family: var(--font-hanken), 'Hanken Grotesk', sans-serif; font-size: 13px;
+  color: var(--ink); background: var(--surface); outline: none; min-width: 0;
 }
-.banter-reply-input:focus { border-color: var(--grass); box-shadow: 0 0 0 3px var(--grass-soft); }
+.banter-reply-input:focus { border-color: var(--grass); }
 .banter-reply-send {
-  font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700; font-size: 13px;
-  cursor: pointer; height: 34px; padding: 0 16px; border-radius: 999px;
-  border: none; background: var(--grass); color: #fff; flex: none; transition: .12s; white-space: nowrap;
+  font-family: var(--font-archivo), 'Archivo', sans-serif; font-weight: 700; font-size: 12px;
+  cursor: pointer; height: 32px; padding: 0 14px; border-radius: 999px;
+  border: none; background: var(--grass); color: #fff; flex: none;
 }
-.banter-reply-send:hover { background: var(--grass-deep); }
 .banter-reply-send:disabled { opacity: .45; cursor: not-allowed; }
 
-/* Desktop sidebar cards */
-.banter-hot-take { padding: 12px 14px; border-bottom: 1px solid var(--line-soft); display: flex; gap: 10px; align-items: flex-start; }
-.banter-hot-take:last-child { border-bottom: 0; }
-.banter-active-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
-.banter-active-row:last-child { border-bottom: 0; }
-
-/* Mobile sidebar: hide full sidebar cards, show compact strip above feed instead */
-.banter-mobile-strip {
-  display: none;
-  gap: 8px;
-  margin-bottom: 14px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding-bottom: 2px;
-}
-.banter-mobile-strip::-webkit-scrollbar { display: none; }
-.banter-mobile-pill {
-  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
-  height: 30px; padding: 0 11px; border-radius: 999px;
-  border: 1px solid var(--line); background: var(--surface); font-size: 13px;
-  white-space: nowrap; box-shadow: var(--shadow-sm);
-}
-.banter-mobile-pill .dot {
-  width: 7px; height: 7px; border-radius: 50%; background: var(--grass); flex-shrink: 0;
-}
-@media (max-width: 920px) {
-  .banter-mobile-strip { display: flex; }
-  .banter-sidebar-desktop { display: none; }
-}
-/* Mobile: tighten up the composer and reply composer */
-@media (max-width: 480px) {
-  .banter-comp-actions { flex-wrap: wrap; }
-  .banter-reply-compose { gap: 7px; padding: 8px 12px; }
-  .banter-reply-send { padding: 0 12px; }
-}
