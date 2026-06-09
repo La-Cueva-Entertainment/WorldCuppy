@@ -55,6 +55,7 @@ export default function DraftTeamTable({
 }: Props) {
   const [tierFilter, setTierFilter] = useState(initialTierKey ?? "all");
   const [search, setSearch] = useState("");
+  const [hideDrafted, setHideDrafted] = useState(false);
 
   const takenSet = new Set(takenTeamCodes);
   const mySet = new Set(myTeamCodes);
@@ -65,6 +66,7 @@ export default function DraftTeamTable({
 
   const filtered = allTeams.filter((tm) => {
     if (tierFilter !== "all" && tm.tierKey !== tierFilter) return false;
+    if (hideDrafted && takenSet.has(tm.code) && !mySet.has(tm.code)) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       return tm.name.toLowerCase().includes(q) || tm.code.toLowerCase().includes(q);
@@ -86,6 +88,19 @@ export default function DraftTeamTable({
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => setHideDrafted((v) => !v)}
+          style={{
+            height: 32, padding: "0 12px", borderRadius: 999, border: "1px solid var(--line)",
+            background: hideDrafted ? "var(--grass-soft)" : "transparent",
+            color: hideDrafted ? "var(--grass-deep)" : "var(--ink-soft)",
+            fontFamily: "var(--font-archivo),Archivo,sans-serif", fontWeight: 700, fontSize: 13,
+            cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+          }}
+        >
+          {hideDrafted ? "✓ Available only" : "Available only"}
+        </button>
         <div className="draft-search">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>
