@@ -79,7 +79,7 @@ export default async function AdminPage({
     const name = String(formData.get("name") ?? "").trim();
     const type = String(formData.get("type") ?? "world_cup").trim();
     const year = Number(formData.get("year") ?? 2026);
-    const teamsPerPlayer = Number(formData.get("teamsPerPlayer") ?? 4);
+    const teamsPerPlayer = Number(formData.get("teamsPerPlayer") ?? 6);
     if (!name) redirect("/admin?error=Name+required");
 
     await prisma.tournament.create({
@@ -303,6 +303,17 @@ export default async function AdminPage({
     redirect("/admin?msg=Pick+timer+saved");
   }
 
+  async function setTeamsPerPlayerAction(formData: FormData) {    "use server";
+    await requireAdmin();
+    const id = String(formData.get("id") ?? "").trim();
+    const raw = String(formData.get("teamsPerPlayer") ?? "").trim();
+    if (!id) redirect("/admin");
+    const teamsPerPlayer = Math.max(1, parseInt(raw, 10));
+    if (!Number.isFinite(teamsPerPlayer)) redirect("/admin?error=Invalid+teams+per+player");
+    await prisma.tournament.update({ where: { id }, data: { teamsPerPlayer } });
+    redirect("/admin?msg=Teams+per+player+saved");
+  }
+
   async function toggleAdminAction(formData: FormData) {    "use server";
     await requireAdmin();
     const uid = String(formData.get("userId") ?? "").trim();
@@ -365,7 +376,7 @@ export default async function AdminPage({
             <option value="euros">Euros</option>
           </select>
           <input name="year" type="number" defaultValue={2026} placeholder="Year" className={input} />
-          <input name="teamsPerPlayer" type="number" defaultValue={4} placeholder="Teams/player" className={input} />
+          <input name="teamsPerPlayer" type="number" defaultValue={6} placeholder="Teams/player" className={input} />
           <button type="submit" className="h-10 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">
             Create
           </button>
@@ -406,6 +417,18 @@ export default async function AdminPage({
                         ? t.draftDate.toLocaleString("sv-SE", { timeZone: "America/Los_Angeles" }).slice(0, 16)
                         : ""}
                       className="h-8 rounded-lg border border-zinc-300 dark:border-white/10 bg-white dark:bg-zinc-800 px-2 text-xs text-zinc-900 dark:text-white outline-none"
+                    />
+                    <button type="submit" className={`h-8 ${ghostBtn}`}>Save</button>
+                  </form>
+                  <form action={setTeamsPerPlayerAction} className="flex items-center gap-2">
+                    <input type="hidden" name="id" value={t.id} />
+                    <label className="text-xs text-zinc-500 dark:text-zinc-500">Teams/player</label>
+                    <input
+                      type="number"
+                      name="teamsPerPlayer"
+                      min={1}
+                      defaultValue={t.teamsPerPlayer}
+                      className="h-8 w-16 rounded-lg border border-zinc-300 dark:border-white/10 bg-white dark:bg-zinc-800 px-2 text-xs text-zinc-900 dark:text-white outline-none"
                     />
                     <button type="submit" className={`h-8 ${ghostBtn}`}>Save</button>
                   </form>

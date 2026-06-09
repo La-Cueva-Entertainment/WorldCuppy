@@ -37,7 +37,7 @@ model Tournament {
   name           String
   type           String    // "world_cup" | "euros"
   year           Int
-  teamsPerPlayer Int       @default(4)
+  teamsPerPlayer Int       @default(6)
   pickSeconds    Int?                // null = unlimited (no timer)
   payoutRules    Json?               // null = use DEFAULT_PAYOUT_RULES from earnings.ts
   status         String    @default("upcoming") // "upcoming" | "draft" | "active" | "complete"
