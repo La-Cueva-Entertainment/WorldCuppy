@@ -111,7 +111,7 @@ export default function DraftTeamTable({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ border: "none", background: "transparent", outline: "none",
-              fontFamily: "inherit", fontSize: 14, color: "var(--ink)", flex: 1, minWidth: 0 }}
+              fontFamily: "inherit", fontSize: 16, color: "var(--ink)", flex: 1, minWidth: 0 }}
           />
         </div>
       </div>

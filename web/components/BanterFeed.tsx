@@ -460,7 +460,7 @@ function ChatComposer({ myId, myName, myColorIdx, onPost, onRefresh }: {
         style={{
           flex: 1, resize: "none", border: "1px solid var(--line)", borderRadius: 20,
           padding: "9px 14px", background: "var(--surface)", color: "var(--ink)",
-          fontSize: 14, fontFamily: "inherit", outline: "none", minHeight: 38,
+          fontSize: 16, fontFamily: "inherit", outline: "none", minHeight: 38,
           lineHeight: 1.4, overflowY: "hidden", minWidth: 0,
         }}
       />
@@ -730,38 +730,40 @@ export default function BanterFeed({
   const [posts, setPosts] = useState(initialPosts);
   const push = usePushNotifications();
 
-  // Merge fresh server posts while preserving unconfirmed optimistic messages
-  function mergePosts(fresh: PostData[]) {
+  // Stable merge function: keeps unconfirmed optimistic posts, replaces with server data
+  const mergePosts = useCallback((fresh: PostData[]) => {
     setPosts(prev => {
       const freshIds = new Set(fresh.map(p => p.id));
-      const freshTexts = new Set(fresh.filter(p => !p.isSystem).map(p => p.text?.trim()).filter(Boolean));
+      const freshTexts = new Set(
+        fresh.filter(p => !p.isSystem).map(p => p.text?.trim()).filter(Boolean) as string[]
+      );
       const pendingOptimistic = prev.filter(
-        p => p.id.startsWith("opt-") && !freshTexts.has(p.text?.trim()) && !freshIds.has(p.id)
+        p => p.id.startsWith("opt-") && !freshIds.has(p.id) && !freshTexts.has(p.text?.trim() ?? "")
       );
       return [...pendingOptimistic, ...fresh];
     });
-  }
+  }, []);
 
-  // Sync from initialPosts (first load / server push)
+  // Sequential polling — next fetch only starts after the previous one finishes,
+  // so stale responses can never overwrite newer ones.
   useEffect(() => {
-    mergePosts(initialPosts);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPosts]);
+    let cancelled = false;
 
-  // Poll /api/banter/posts every 10 seconds — always hits the DB, bypasses RSC cache
-  useEffect(() => {
-    const poll = async () => {
+    async function poll() {
+      if (cancelled) return;
       try {
         const res = await fetch("/api/banter/posts", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json() as { posts: PostData[] };
-        mergePosts(data.posts);
+        if (res.ok && !cancelled) {
+          const data = await res.json() as { posts: PostData[] };
+          if (!cancelled) mergePosts(data.posts);
+        }
       } catch { /* ignore network errors */ }
-    };
-    const id = setInterval(poll, 10_000);
-    return () => clearInterval(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      if (!cancelled) setTimeout(poll, 10_000);
+    }
+
+    const t = setTimeout(poll, 10_000);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [mergePosts]);
 
   // Stable color index for current user
   const myColorIdx = useCallback(() => {
