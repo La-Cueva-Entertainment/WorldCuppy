@@ -195,19 +195,19 @@ export default function DraftTeamTable({
       </div>
 
       {/* How tiers pay legend */}
-      <div className="sec-head" style={{ margin: "26px 0 12px" }}>
-        <h2 style={{ fontSize: 19 }}>How tiers pay — &ldquo;jumps&rdquo;</h2>
+      <div className="mt-6 mb-3 flex items-center gap-2">
+        <h2 className="text-base font-bold text-zinc-900 dark:text-white">How tiers pay — &ldquo;jumps&rdquo;</h2>
       </div>
-      <div className="legend">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {tiers.map((t) => (
-          <div key={t.key} className="l">
+          <div key={t.key} className="rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 p-3">
             <span className={`tier tier-${t.num}`}>{t.labelBase}</span>
-            <div className="muted">{t.rangeLabel}</div>
-            <div className={`jp${t.num > 1 ? " pos" : ""}`}>{t.jump}</div>
+            <div className="mt-1.5 text-xs text-zinc-400 dark:text-zinc-500">{t.rangeLabel}</div>
+            <div className={`mt-1 font-mono font-bold text-sm ${t.num > 1 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500 dark:text-zinc-400"}`}>{t.jump}</div>
           </div>
         ))}
       </div>
-      <p className="tag-soft" style={{ marginTop: 10 }}>
+      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
         A <strong>jump</strong> = your team beating a higher-tier team in the knockouts.
         Lower-tier upsets pay more, so a smart long-shot pick can win you the pool.
       </p>

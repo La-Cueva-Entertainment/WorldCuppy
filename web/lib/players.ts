@@ -44,7 +44,7 @@ export const TEAM_PLAYERS: Record<string, PlayerEntry[]> = {
   jor: [{ name: "Yazan Al-Naimat", position: "FWD" }, { name: "Musa Al-Taamari", position: "FWD" }, { name: "Ahmad Alnaber", position: "MID" }],
   cpv: [{ name: "Ryan Mendes", position: "FWD" }, { name: "Garry Rodrigues", position: "FWD" }, { name: "Stopira", position: "DEF" }],
   gha: [{ name: "Jordan Ayew", position: "FWD" }, { name: "Thomas Partey", position: "MID" }, { name: "Mohammed Kudus", position: "MID" }],
-  cuw: [{ name: "Leandro Bacuna", position: "MID" }, { name: "Jurickson Profar", position: "FWD" }, { name: "Cuco Martina", position: "DEF" }],
+  cuw: [{ name: "Leandro Bacuna", position: "MID" }, { name: "Cuco Martina", position: "DEF" }, { name: "Rangelo Janga", position: "FWD" }],
   hai: [{ name: "Duckens Nazon", position: "FWD" }, { name: "Frantzdy Pierrot", position: "FWD" }, { name: "Mechack Jérôme", position: "DEF" }],
   nzl: [{ name: "Chris Wood", position: "FWD" }, { name: "Clayton Lewis", position: "MID" }, { name: "Bill Tuilagi", position: "DEF" }],
 };
