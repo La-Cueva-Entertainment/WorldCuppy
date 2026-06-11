@@ -3,14 +3,33 @@ import { hash } from "bcryptjs";
 
 import { prisma } from "@/lib/prisma";
 
+// Simple in-memory rate limiter: max 5 attempts per IP per hour
+const attempts = new Map<string, { count: number; resetAt: number }>();
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = attempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    attempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= MAX_ATTEMPTS) return false;
+  entry.count += 1;
+  return true;
+}
+
 export async function POST(request: Request) {
-  // Block registration unless REGISTRATION_OPEN=true is set.
-  // For a private friend group you leave this unset and create accounts manually
-  // via the admin panel or by setting the env var temporarily.
-  if (process.env.REGISTRATION_OPEN !== "true") {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown";
+
+  if (!checkRateLimit(ip)) {
     return NextResponse.json(
-      { error: "Registration is closed" },
-      { status: 403 }
+      { error: "Too many registration attempts. Try again in an hour." },
+      { status: 429 }
     );
   }
 
@@ -19,7 +38,29 @@ export async function POST(request: Request) {
       name?: string;
       email?: string;
       password?: string;
+      inviteToken?: string;
     };
+
+    const inviteToken = body.inviteToken?.trim() || null;
+
+    if (process.env.REGISTRATION_OPEN !== "true") {
+      if (!inviteToken) {
+        return NextResponse.json(
+          { error: "Registration is closed" },
+          { status: 403 }
+        );
+      }
+      const validTournament = await prisma.tournament.findUnique({
+        where: { inviteToken },
+        select: { id: true },
+      });
+      if (!validTournament) {
+        return NextResponse.json(
+          { error: "Invalid or expired invite link" },
+          { status: 403 }
+        );
+      }
+    }
 
     const email = body.email?.toLowerCase().trim();
     const password = body.password;
@@ -50,11 +91,7 @@ export async function POST(request: Request) {
     const passwordHash = await hash(password, 12);
 
     const user = await prisma.user.create({
-      data: {
-        email,
-        name,
-        passwordHash,
-      },
+      data: { email, name, passwordHash },
       select: { id: true, email: true, name: true },
     });
 

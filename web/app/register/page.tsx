@@ -1,113 +1,50 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
-import { signIn } from "next-auth/react";
 
-type Status =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "error"; message: string };
+import { prisma } from "@/lib/prisma";
+import RegisterForm from "./RegisterForm";
 
-export default function RegisterPage() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [status, setStatus] = useState<Status>({ kind: "idle" });
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams?: { invite?: string } | Promise<{ invite?: string }>;
+}) {
+  const params = searchParams ? await Promise.resolve(searchParams) : {};
+  const inviteToken = params.invite?.trim() || null;
 
-  async function onRegister(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus({ kind: "loading" });
-
-    const resp = await fetch("/api/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+  let poolName: string | null = null;
+  if (inviteToken) {
+    const t = await prisma.tournament.findUnique({
+      where: { inviteToken },
+      select: { poolName: true, name: true, year: true },
     });
-
-    if (!resp.ok) {
-      const data = (await resp.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-      setStatus({
-        kind: "error",
-        message: data?.error ?? "Registration failed",
-      });
-      return;
-    }
-
-    await signIn("credentials", {
-      email,
-      password,
-      callbackUrl: "/dashboard",
-      redirect: true,
-    });
+    if (t) poolName = t.poolName ?? `${t.name} ${t.year}`;
   }
 
   return (
     <div className="min-h-screen">
       <main className="mx-auto flex w-full max-w-lg flex-col gap-6 px-6 py-12">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-white">
-              Create account
-            </h1>
-            <p className="mt-1 text-sm text-zinc-300">
-              Create an email/password account.
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+            Create account
+          </h1>
+          {poolName ? (
+            <p className="mt-1 text-sm text-zinc-500">
+              You&apos;ve been invited to join <span className="font-medium text-zinc-700">{poolName}</span>.
             </p>
-          </div>
-          <Link href="/login" className="text-sm text-zinc-300 hover:text-white">
-            Sign in
-          </Link>
+          ) : (
+            <p className="mt-1 text-sm text-zinc-500">
+              Sign up with email and password.
+            </p>
+          )}
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-black/30 p-6 ring-1 ring-inset ring-white/5 backdrop-blur">
-          <form onSubmit={onRegister} className="grid gap-3">
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-zinc-200">Name</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                type="text"
-                autoComplete="name"
-                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-green-500/40"
-              />
-            </label>
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-zinc-200">Email</span>
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                autoComplete="email"
-                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-green-500/40"
-                required
-              />
-            </label>
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-zinc-200">Password</span>
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                autoComplete="new-password"
-                className="h-11 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-zinc-400 focus:border-green-500/40"
-                required
-              />
-            </label>
+        <RegisterForm inviteToken={inviteToken} />
 
-            <button
-              type="submit"
-              disabled={status.kind === "loading"}
-              className="mt-2 w-full rounded-xl bg-green-500/20 px-4 py-2.5 text-sm font-medium text-green-50 ring-1 ring-inset ring-green-500/30 hover:bg-green-500/25 disabled:opacity-60"
-            >
-              Create account
-            </button>
-
-            {status.kind === "error" ? (
-              <p className="mt-2 text-sm text-red-400">{status.message}</p>
-            ) : null}
-          </form>
+        <div className="text-center text-sm text-zinc-500">
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-emerald-600 hover:text-emerald-700">
+            Sign in
+          </Link>
         </div>
       </main>
     </div>

@@ -4,27 +4,14 @@ import Link from "next/link";
 
 import { CountryFlag } from "@/components/CountryFlag";
 import { CountdownTimer } from "@/components/CountdownTimer";
+import { LiveSync } from "@/components/LiveSync";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
-import { matchEarningsCents, totalEarningsCents, formatDollars, type MatchResult } from "@/lib/earnings";
+import { matchEarningsCents, totalEarningsCents, calcPrizeCents, formatDollars, resolveConfig, type MatchResult, type OddsJumpInput } from "@/lib/earnings";
+import { colorFor } from "@/lib/playerColors";
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
-
-const PLAYER_COLORS = [
-  { bg: "bg-emerald-50", ring: "ring-emerald-300", text: "text-emerald-700", dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-800" },
-  { bg: "bg-amber-50", ring: "ring-amber-300", text: "text-amber-700", dot: "bg-amber-500", badge: "bg-amber-100 text-amber-800" },
-  { bg: "bg-sky-50", ring: "ring-sky-300", text: "text-sky-700", dot: "bg-sky-500", badge: "bg-sky-100 text-sky-800" },
-  { bg: "bg-rose-50", ring: "ring-rose-300", text: "text-rose-700", dot: "bg-rose-500", badge: "bg-rose-100 text-rose-800" },
-  { bg: "bg-purple-50", ring: "ring-purple-300", text: "text-purple-700", dot: "bg-purple-500", badge: "bg-purple-100 text-purple-800" },
-  { bg: "bg-orange-50", ring: "ring-orange-300", text: "text-orange-700", dot: "bg-orange-500", badge: "bg-orange-100 text-orange-800" },
-  { bg: "bg-cyan-50", ring: "ring-cyan-300", text: "text-cyan-700", dot: "bg-cyan-500", badge: "bg-cyan-100 text-cyan-800" },
-  { bg: "bg-fuchsia-50", ring: "ring-fuchsia-300", text: "text-fuchsia-700", dot: "bg-fuchsia-500", badge: "bg-fuchsia-100 text-fuchsia-800" },
-];
-
-function colorFor(idx: number) {
-  return PLAYER_COLORS[idx % PLAYER_COLORS.length];
-}
 
 const STAGE_LABELS: Record<string, string> = {
   group: "Group Stage",
@@ -38,7 +25,13 @@ const STAGE_LABELS: Record<string, string> = {
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
+  if (!session?.user?.id) redirect("/login");
+
+  const me = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { isAdmin: true },
+  });
+  const isAdmin = me?.isAdmin ?? false;
 
   // Find active tournament
   const tournament = await prisma.tournament.findFirst({
@@ -52,16 +45,16 @@ export default async function DashboardPage() {
       <main className="mx-auto w-full max-w-4xl px-6 py-16 text-center">
         <div className="mb-8"><CountdownTimer /></div>
         <div className="text-5xl mb-4">🔜</div>
-        <h1 className="text-2xl font-bold text-slate-900">No active tournament yet</h1>
-        <p className="mt-2 text-slate-500">An admin will set up the next tournament shortly.</p>
+        <h1 className="text-2xl font-bold text-zinc-900">No active tournament yet</h1>
+        <p className="mt-2 text-zinc-500">An admin will set up the next tournament shortly.</p>
       </main>
     );
   }
 
-  const [picks, matches, users, adjustments] = await Promise.all([
+  const [picks, matches, users, adjustments, teamOddsRows, scoringConfigRow] = await Promise.all([
     prisma.lineupPick.findMany({
       where: { tournamentId: tournament.id },
-      select: { userId: true, teamCode: true },
+      select: { userId: true, teamCode: true, draftOdds: true },
     }),
     prisma.match.findMany({
       where: { tournamentId: tournament.id, played: true },
@@ -72,7 +65,17 @@ export default async function DashboardPage() {
       where: { tournamentId: tournament.id },
       select: { userId: true, amountCents: true, reason: true },
     }),
+    prisma.teamOdds.findMany({
+      where: { tournamentId: tournament.id },
+      select: { teamCode: true, currentOdds: true },
+    }),
+    prisma.scoringConfig.findUnique({
+      where: { tournamentId: tournament.id },
+      select: { config: true },
+    }),
   ]);
+
+  const scoringConfig = resolveConfig(scoringConfigRow?.config ?? null);
 
   const userById = new Map(users.map((u) => [u.id, u]));
 
@@ -95,6 +98,22 @@ export default async function DashboardPage() {
     teamsByPlayer.set(p.userId, s);
   }
 
+  // Build current odds map for odds-jump bonus
+  const currentOddsMap = new Map(teamOddsRows.map((r) => [r.teamCode, r.currentOdds]));
+
+  function buildOddsData(playerTeamCodes: string[]): OddsJumpInput[] | undefined {
+    const result: OddsJumpInput[] = [];
+    for (const code of playerTeamCodes) {
+      const pick = picks.find((p) => p.teamCode === code);
+      const draftOdds = pick?.draftOdds;
+      const currentOdds = currentOddsMap.get(code);
+      if (draftOdds != null && currentOdds != null) {
+        result.push({ teamCode: code, draftOdds, currentOdds });
+      }
+    }
+    return result.length > 0 ? result : undefined;
+  }
+
   // Compute earnings per player
   const matchResults: MatchResult[] = matches.map((m) => ({
     stage: m.stage as MatchResult["stage"],
@@ -109,7 +128,8 @@ export default async function DashboardPage() {
   const earnings = new Map<string, number>();
   for (const uid of playerIds) {
     const teams = teamsByPlayer.get(uid) ?? new Set<string>();
-    const earned = totalEarningsCents(matchResults, teams);
+    const oddsData = buildOddsData([...teams]);
+    const earned = totalEarningsCents(matchResults, teams, oddsData, scoringConfig);
     const adj = adjustments
       .filter((a) => a.userId === uid)
       .reduce((s, a) => s + a.amountCents, 0);
@@ -120,6 +140,9 @@ export default async function DashboardPage() {
   const ranked = playerIds
     .map((uid, i) => ({ uid, earnings: earnings.get(uid) ?? 0, colorIdx: i }))
     .sort((a, b) => b.earnings - a.earnings);
+
+  const prizes = calcPrizeCents(ranked.map((r) => r.uid), playerIds.length, scoringConfig);
+  const totalPotCents = scoringConfig.buyInCents * playerIds.length;
 
   // Today's matches
   const todayStart = new Date();
@@ -140,6 +163,10 @@ export default async function DashboardPage() {
     },
   });
 
+  const matchTimes = todayMatches
+    .map((m) => m.matchDate?.getTime() ?? null)
+    .filter((t): t is number => t !== null);
+
   // Per-match payouts: matchId → { userId → cents }
   type MatchPayouts = Map<string, Map<string, number>>;
   const matchPayouts: MatchPayouts = new Map();
@@ -156,7 +183,7 @@ export default async function DashboardPage() {
     const perPlayer = new Map<string, number>();
     for (const uid of playerIds) {
       const teams = teamsByPlayer.get(uid) ?? new Set<string>();
-      const cents = matchEarningsCents(mr, teams.has(m.homeTeam), teams.has(m.awayTeam));
+      const cents = matchEarningsCents(mr, teams.has(m.homeTeam), teams.has(m.awayTeam), scoringConfig);
       if (cents > 0) perPlayer.set(uid, cents);
     }
     matchPayouts.set(m.id, perPlayer);
@@ -185,6 +212,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      <LiveSync canSync={isAdmin} matchTimes={matchTimes} />
       {/* Countdown */}
       <div className="mb-8">
         <CountdownTimer />
@@ -267,7 +295,7 @@ export default async function DashboardPage() {
                     <div className="mt-3 flex flex-wrap gap-1.5 border-t border-zinc-100 pt-3">
                       {[...payouts.entries()].map(([uid, cents]) => {
                         const u = userById.get(uid);
-                        const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
+                        const name = u?.name ?? "Player";
                         const playerIdx = playerIds.indexOf(uid);
                         const c = colorFor(playerIdx);
                         return (
@@ -289,16 +317,23 @@ export default async function DashboardPage() {
       <div className="grid gap-8 lg:grid-cols-[1fr_1.6fr]">
         {/* — Standings — */}
         <section>
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-zinc-500">
-            Standings
-          </h2>
+          <div className="mb-4 flex items-baseline justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Standings</h2>
+            {totalPotCents > 0 && (
+              <span className="text-xs text-zinc-400">
+                Pot: <span className="font-semibold text-zinc-600">{formatDollars(totalPotCents)}</span>
+                <span className="ml-1 text-zinc-400">({formatDollars(scoringConfig.buyInCents)} × {playerIds.length})</span>
+              </span>
+            )}
+          </div>
           <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 text-xs text-zinc-500">
                   <th className="py-3 pl-4 text-left font-medium">#</th>
                   <th className="py-3 text-left font-medium">Player</th>
-                  <th className="py-3 pr-4 text-right font-medium">Earned</th>
+                  <th className="py-3 text-right font-medium">Score</th>
+                  <th className="py-3 pr-4 text-right font-medium">Prize</th>
                 </tr>
               </thead>
               <tbody>
@@ -306,6 +341,7 @@ export default async function DashboardPage() {
                   const c = colorFor(row.colorIdx);
                   const user = userById.get(row.uid);
                   const teams = [...(teamsByPlayer.get(row.uid) ?? [])];
+                  const prize = prizes.get(row.uid) ?? 0;
                   return (
                     <tr key={row.uid} className="border-b border-zinc-50 hover:bg-zinc-50">
                       <td className="py-3 pl-4 font-mono text-zinc-400">{i + 1}</td>
@@ -314,7 +350,7 @@ export default async function DashboardPage() {
                           <div className="flex items-center gap-2">
                             <span className={`h-2.5 w-2.5 rounded-full ${c.dot}`} />
                             <span className="font-semibold text-zinc-900">
-                              {user?.name ?? user?.email ?? row.uid.slice(0, 8)}
+                              {user?.name ?? "Player"}
                             </span>
                           </div>
                           <div className="grid grid-cols-3 gap-1 pl-4">
@@ -330,15 +366,18 @@ export default async function DashboardPage() {
                           </div>
                         </div>
                       </td>
-                      <td className={`py-3 pr-4 text-right font-bold tabular-nums ${c.text}`}>
+                      <td className="py-3 text-right tabular-nums text-zinc-400 text-xs">
                         {formatDollars(row.earnings)}
+                      </td>
+                      <td className={`py-3 pr-4 text-right font-bold tabular-nums ${prize > 0 ? c.text : "text-zinc-300"}`}>
+                        {prize > 0 ? formatDollars(prize) : "—"}
                       </td>
                     </tr>
                   );
                 })}
                 {ranked.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="py-8 text-center text-zinc-400">
+                    <td colSpan={4} className="py-8 text-center text-zinc-400">
                       No picks yet — go draft your teams!
                     </td>
                   </tr>

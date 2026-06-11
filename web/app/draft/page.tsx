@@ -1,20 +1,27 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
 
 import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
 import { CountryFlag } from "@/components/CountryFlag";
 import { DraftPickTimer } from "@/components/DraftPickTimer";
 import TieredTeamsBox from "@/components/TieredTeamsBox";
-import { authOptions } from "@/lib/auth";
+import { LiveRefresh } from "@/components/LiveRefresh";
+import { requireUserId } from "@/lib/auth";
 import { getSnakeTurnUserId } from "@/lib/draft";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
 
 const PICK_SECONDS = Number.parseInt(process.env.DRAFT_PICK_SECONDS ?? "60", 10) || 60;
 
+// Static lookup — dynamic class names like `bg-${color}-500` get purged by Tailwind JIT
 const MANAGER_COLORS = [
-  "rose", "amber", "lime", "emerald", "cyan", "sky", "indigo", "fuchsia",
+  { active: "bg-rose-100 ring-rose-300 text-rose-700 animate-pulse",    inactive: "bg-rose-50 ring-rose-200 text-rose-500" },
+  { active: "bg-amber-100 ring-amber-300 text-amber-700 animate-pulse",  inactive: "bg-amber-50 ring-amber-200 text-amber-500" },
+  { active: "bg-lime-100 ring-lime-300 text-lime-700 animate-pulse",    inactive: "bg-lime-50 ring-lime-200 text-lime-500" },
+  { active: "bg-emerald-100 ring-emerald-300 text-emerald-700 animate-pulse", inactive: "bg-emerald-50 ring-emerald-200 text-emerald-500" },
+  { active: "bg-cyan-100 ring-cyan-300 text-cyan-700 animate-pulse",    inactive: "bg-cyan-50 ring-cyan-200 text-cyan-500" },
+  { active: "bg-sky-100 ring-sky-300 text-sky-700 animate-pulse",       inactive: "bg-sky-50 ring-sky-200 text-sky-500" },
+  { active: "bg-indigo-100 ring-indigo-300 text-indigo-700 animate-pulse", inactive: "bg-indigo-50 ring-indigo-200 text-indigo-500" },
+  { active: "bg-fuchsia-100 ring-fuchsia-300 text-fuchsia-700 animate-pulse", inactive: "bg-fuchsia-50 ring-fuchsia-200 text-fuchsia-500" },
 ] as const;
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
@@ -34,18 +41,7 @@ export default async function DraftPage({
   searchParams?: { error?: string; tier?: string } | Promise<{ error?: string; tier?: string }>;
 }) {
   const resolved = searchParams ? await Promise.resolve(searchParams) : {};
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
-
-  let userId: string | undefined = session.user.id;
-  if (!userId) {
-    const email = session.user.email?.toLowerCase().trim();
-    if (email) {
-      const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-      userId = user?.id;
-    }
-  }
-  if (!userId) redirect("/login");
+  const userId = await requireUserId();
 
   // Check if user is admin
   const me = await prisma.user.findUnique({
@@ -65,8 +61,8 @@ export default async function DraftPage({
     return (
       <main className="mx-auto w-full max-w-2xl px-6 py-16 text-center">
         <div className="text-5xl mb-4">🔜</div>
-        <h1 className="text-2xl font-bold text-white">No draft open</h1>
-        <p className="mt-2 text-zinc-400">No tournament is currently in draft mode.</p>
+        <h1 className="text-2xl font-bold text-zinc-900">No draft open</h1>
+        <p className="mt-2 text-zinc-500">No tournament is currently in draft mode.</p>
       </main>
     );
   }
@@ -135,7 +131,6 @@ export default async function DraftPage({
   async function draftTeamAction(formData: FormData) {
     "use server";
 
-    const hdrs = await headers();
     const tier = String(formData.get("tier") ?? "").trim();
     const redirectBase = tier ? `/draft?tier=${encodeURIComponent(tier)}` : "/draft";
 
@@ -144,20 +139,7 @@ export default async function DraftPage({
       redirect(`${redirectBase}${redirectBase.includes("?") ? "&" : "?"}error=${encodeURIComponent(error)}`);
     };
 
-    void hdrs;
-
-    const session = await getServerSession(authOptions);
-    if (!session) redirect("/login");
-
-    let uid: string | undefined = session.user.id;
-    if (!uid) {
-      const email = session.user.email?.toLowerCase().trim();
-      if (email) {
-        const u = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-        uid = u?.id;
-      }
-    }
-    if (!uid) redirect("/login");
+    const uid = await requireUserId();
 
     const tournamentId = String(formData.get("tournamentId") ?? "").trim();
     const teamCode = String(formData.get("teamCode") ?? "").trim();
@@ -193,8 +175,9 @@ export default async function DraftPage({
         const taken = await tx.lineupPick.findFirst({ where: { tournamentId, teamCode }, select: { id: true } });
         if (taken) throw new Error("TAKEN");
 
+        const teamData = TEAMS_BY_CODE.get(teamCode);
         await tx.lineupPick.create({
-          data: { tournamentId, userId: uid, teamCode, pickNumber: draft.currentPick },
+          data: { tournamentId, userId: uid, teamCode, pickNumber: draft.currentPick, draftOdds: teamData?.rank ?? null },
           select: { id: true },
         });
 
@@ -220,33 +203,19 @@ export default async function DraftPage({
   async function startDraftAction(formData: FormData) {
     "use server";
 
-    const session = await getServerSession(authOptions);
-    if (!session) redirect("/login");
-
-    let uid: string | undefined = session.user.id;
-    if (!uid) {
-      const email = session.user.email?.toLowerCase().trim();
-      if (email) {
-        const u = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-        uid = u?.id;
-      }
-    }
-    if (!uid) redirect("/login");
-
+    const uid = await requireUserId();
     const adminUser = await prisma.user.findUnique({ where: { id: uid }, select: { isAdmin: true } });
     if (!adminUser?.isAdmin) redirect("/draft?error=Admins%20only");
 
     const tournamentId = String(formData.get("tournamentId") ?? "").trim();
     if (!tournamentId) redirect("/draft");
 
-    const allPlayers = await prisma.user.findMany({
-      where: { lineupPicks: { none: {} } }, // placeholder — in practice just use all users
+    // Only include users who have signed up (have an account with a name or email verified)
+    const participants = await prisma.user.findMany({
+      where: { email: { not: null } },
       select: { id: true },
     });
-
-    // Use all users who have accounts
-    const allUsers = await prisma.user.findMany({ select: { id: true } });
-    const orderIds = shuffle(allUsers.map((u) => u.id));
+    const orderIds = shuffle(participants.map((u) => u.id));
 
     await prisma.tournamentDraft.upsert({
       where: { tournamentId },
@@ -277,13 +246,15 @@ export default async function DraftPage({
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      {/* Refresh draft state every 15s so turn order stays current */}
+      {draftActive && <LiveRefresh intervalMs={15_000} />}
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-white">
-            Draft — <span className="text-green-400">{tournament.name} {tournament.year}</span>
+          <h1 className="text-3xl font-extrabold text-zinc-900">
+            Draft — <span className="text-emerald-600">{tournament.name} {tournament.year}</span>
           </h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-500">
             {LINEUP_SIZE} teams per player · snake draft
           </p>
         </div>
@@ -293,7 +264,7 @@ export default async function DraftPage({
             <input type="hidden" name="tournamentId" value={tournament.id} />
             <ConfirmSubmitButton
               confirmText="Start the draft? This will reset any existing picks."
-              className="inline-flex h-10 items-center rounded-xl bg-amber-500/20 px-5 text-sm font-semibold text-amber-300 ring-1 ring-amber-500/40 hover:bg-amber-500/30"
+              className="inline-flex h-10 items-center rounded-xl bg-amber-500 px-5 text-sm font-semibold text-white hover:bg-amber-600"
             >
               Start Draft
             </ConfirmSubmitButton>
@@ -303,7 +274,7 @@ export default async function DraftPage({
 
       {/* Error */}
       {resolved.error && (
-        <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+        <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {resolved.error}
         </div>
       )}
@@ -311,13 +282,13 @@ export default async function DraftPage({
       {draftActive ? (
         <>
           {/* Draft status bar */}
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-5 py-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">Now Picking</div>
-              <div className="text-lg font-bold text-white">
+              <div className="text-lg font-bold text-zinc-900">
                 {canPickNow ? "Your turn! 🎉" : currentPickerName}
               </div>
-              <div className="text-xs text-zinc-400 mt-0.5">
+              <div className="text-xs text-zinc-500 mt-0.5">
                 Round {roundNumber} · Pick {pickInRound} of {orderUserIds.length}
               </div>
             </div>
@@ -330,19 +301,17 @@ export default async function DraftPage({
           <div className="mb-6 flex flex-wrap gap-2">
             {orderUserIds.map((uid, idx) => {
               const u = userById.get(uid);
-              const name = u?.name ?? u?.email?.split("@")[0] ?? "?";
+              const name = u?.name ?? `Player ${idx + 1}`;
               const isCurrent = draftActive && idx === (currentPick % orderUserIds.length)
                 && Math.floor(currentPick / orderUserIds.length) % 2 === 0
                   ? idx === currentPick % orderUserIds.length
                   : idx === orderUserIds.length - 1 - (currentPick % orderUserIds.length);
-              const colorKey = MANAGER_COLORS[idx % MANAGER_COLORS.length];
+              const colors = MANAGER_COLORS[idx % MANAGER_COLORS.length];
               return (
                 <div
                   key={uid}
                   className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
-                    isCurrent
-                      ? `bg-${colorKey}-500/25 ring-${colorKey}-500/60 text-${colorKey}-200 animate-pulse`
-                      : `bg-${colorKey}-500/10 ring-${colorKey}-500/20 text-${colorKey}-300`
+                    isCurrent ? colors.active : colors.inactive
                   }`}
                 >
                   {name} ({allPicks.filter((p) => p.userId === uid).length}/{LINEUP_SIZE})
@@ -352,8 +321,8 @@ export default async function DraftPage({
           </div>
         </>
       ) : (
-        <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 px-5 py-4">
-          <p className="text-sm text-zinc-300">
+        <div className="mb-6 rounded-2xl border border-zinc-200 bg-zinc-50 px-5 py-4">
+          <p className="text-sm text-zinc-600">
             {draft?.status === "complete" || currentPick >= maxPicks
               ? "Draft is complete! Check the standings."
               : "Draft has not started yet. Waiting for admin to begin."}

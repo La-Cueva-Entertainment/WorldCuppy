@@ -23,21 +23,29 @@ model User {
   sessions            Session[]
   lineupPicks         LineupPick[]
   earningsAdjustments EarningsAdjustment[]
+  auditLogs           AdminAuditLog[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Tournament {
   id             String   @id @default(cuid())
   name           String
-  type           String   // "world_cup" | "euros"
+  type           String   // "world_cup" | "euros" | "champions_league" | "copa_libertadores"
   year           Int
   teamsPerPlayer Int      @default(4)
   status         String   @default("upcoming") // "upcoming" | "draft" | "active" | "complete"
+  apiCode        String?  // football-data.org competition code, e.g. "WC", "CL", "CLI"
+  apiSeason      Int?     // API season year (may differ from year for cross-year competitions)
+  poolName       String?  // custom name for the friend pool, e.g. "Chris's WC2026 Pool"
+  inviteToken    String?  @unique  // shared invite link token
   createdAt      DateTime @default(now())
 
-  draft       TournamentDraft?
-  picks       LineupPick[]
-  matches     Match[]
-  adjustments EarningsAdjustment[]
+  draft         TournamentDraft?
+  picks         LineupPick[]
+  matches       Match[]
+  adjustments   EarningsAdjustment[]
+  teamOdds      TeamOdds[]
+  scoringConfig ScoringConfig?
 }
 
 model TournamentDraft {
@@ -88,6 +96,7 @@ model Match {
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 
   @@index([tournamentId, stage])
+  @@index([tournamentId, matchDate])
 }
 
 model EarningsAdjustment {
@@ -135,6 +144,19 @@ model Session {
   @@index([userId])
 }
 
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -143,20 +165,36 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model TeamPoints {
-  teamCode  String   @id
-  points    Int      @default(0)
-  updatedAt DateTime @updatedAt
+model TeamOdds {
+  id           String   @id @default(cuid())
+  tournamentId String
+  teamCode     String
+  currentOdds  Int
+  updatedAt    DateTime @updatedAt
 
-  @@index([points])
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, teamCode])
+  @@index([tournamentId])
 }
 
-model TeamStagePoints {
-  teamCode  String
-  stageKey  String
-  points    Int      @default(0)
-  updatedAt DateTime @updatedAt
+model ScoringConfig {
+  tournamentId String   @id
+  config       Json
+  updatedAt    DateTime @updatedAt
 
-  @@id([teamCode, stageKey])
-  @@index([stageKey])
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+}
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String
+  target    String
+  changes   Json
+  createdAt DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id])
+
+  @@index([adminId, createdAt])
 }

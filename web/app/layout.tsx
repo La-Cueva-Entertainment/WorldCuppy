@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import "./globals.css";
 
 import { AuthButtons } from "@/components/AuthButtons";
+import { MobileNav } from "@/components/MobileNav";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSiteOwner } from "@/lib/siteOwner";
@@ -35,36 +36,24 @@ export default async function RootLayout({
   let picksCount: number | null = null;
   let isAdmin = false;
 
-  if (session) {
-    let userId: string | undefined = session.user.id;
-    if (!userId) {
-      const email = session.user.email?.toLowerCase().trim();
-      if (email) {
-        const user = await prisma.user.findUnique({
-          where: { email },
-          select: { id: true },
-        });
-        userId = user?.id;
-      }
-    }
+  const userId = session?.user?.id ?? null;
 
-    if (userId) {
-      const [user, activeTournament] = await Promise.all([
-        prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } }),
-        prisma.tournament.findFirst({
-          where: { status: { in: ["draft", "active"] } },
-          orderBy: { createdAt: "desc" },
-          select: { id: true, teamsPerPlayer: true },
-        }),
-      ]);
+  if (userId) {
+    const [user, activeTournament] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } }),
+      prisma.tournament.findFirst({
+        where: { status: { in: ["draft", "active"] } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, teamsPerPlayer: true },
+      }),
+    ]);
 
-      isAdmin = user?.isAdmin ?? false;
+    isAdmin = user?.isAdmin ?? false;
 
-      if (activeTournament) {
-        picksCount = await prisma.lineupPick.count({
-          where: { userId, tournamentId: activeTournament.id },
-        });
-      }
+    if (activeTournament) {
+      picksCount = await prisma.lineupPick.count({
+        where: { userId, tournamentId: activeTournament.id },
+      });
     }
   }
 
@@ -118,7 +107,8 @@ export default async function RootLayout({
             <div className="h-0.5 bg-gradient-to-r from-emerald-500 to-emerald-400" />
           </div>
 
-          <div>{children}</div>
+          <div className="pb-16 md:pb-0">{children}</div>
+          {session && <MobileNav isAdmin={isAdmin || siteOwner} />}
         </div>
       </body>
     </html>

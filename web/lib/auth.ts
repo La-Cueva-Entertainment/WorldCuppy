@@ -1,11 +1,13 @@
 import type { NextAuthOptions } from "next-auth";
-import NextAuth from "next-auth";
+import NextAuth, { getServerSession } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { compare } from "bcryptjs";
+import { redirect } from "next/navigation";
 
 import { prisma } from "@/lib/prisma";
+import { isSiteOwner } from "@/lib/siteOwner";
 
 const providers: NextAuthOptions["providers"] = [
   CredentialsProvider({
@@ -56,6 +58,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 24 hours
   },
   events: {},
   callbacks: {
@@ -75,3 +78,24 @@ export const authOptions: NextAuthOptions = {
 };
 
 export const nextAuthHandler = NextAuth(authOptions);
+
+/** Returns the current user's ID or redirects to /login. Use in server components and server actions. */
+export async function requireUserId(): Promise<string> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) redirect("/login");
+  return session.user.id;
+}
+
+/** Returns the current user's ID if they are an admin, or redirects. */
+export async function requireAdmin(): Promise<string> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) redirect("/login");
+  const uid = session.user.id;
+  const siteOwner = isSiteOwner(session);
+  const user = await prisma.user.findUnique({
+    where: { id: uid },
+    select: { isAdmin: true },
+  });
+  if (!user?.isAdmin && !siteOwner) redirect("/dashboard");
+  return uid;
+}

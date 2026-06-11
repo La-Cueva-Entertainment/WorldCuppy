@@ -28,23 +28,6 @@ export function AuthButtons({
           My Lineup
         </Link>
 
-        {/* Mobile nav links */}
-        <Link
-          href="/dashboard"
-          className="inline-flex h-9 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 md:hidden"
-        >
-          Standings
-        </Link>
-
-        {isAdmin && (
-          <Link
-            href="/admin"
-            className="inline-flex h-9 items-center rounded-xl border border-amber-300 bg-amber-50 px-3 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 md:hidden"
-          >
-            Admin
-          </Link>
-        )}
-
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: "/" })}

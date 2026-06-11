@@ -95,6 +95,12 @@ export default function LoginPage() {
             {status.kind === "error" ? (
               <p className="mt-2 text-sm text-red-600">{status.message}</p>
             ) : null}
+
+            <p className="text-center text-xs text-zinc-500">
+              <Link href="/forgot-password" className="hover:underline">
+                Forgot password?
+              </Link>
+            </p>
           </form>
 
           <div className="my-5 border-t border-zinc-200" />
