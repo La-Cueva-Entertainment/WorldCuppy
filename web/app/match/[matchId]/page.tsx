@@ -39,6 +39,98 @@ function fmtDateTime(iso: string | null | undefined): string | null {
   });
 }
 
+// World Cup 2026 venue coordinates for Open-Meteo weather (no API key required)
+const VENUE_COORDS: Record<string, { lat: number; lon: number }> = {
+  "MetLife Stadium":         { lat: 40.8135, lon: -74.0745 },
+  "AT&T Stadium":            { lat: 32.7480, lon: -97.0929 },
+  "SoFi Stadium":            { lat: 33.9535, lon: -118.3392 },
+  "Rose Bowl":               { lat: 34.1614, lon: -118.1676 },
+  "Levi's Stadium":          { lat: 37.4034, lon: -121.9700 },
+  "Arrowhead Stadium":       { lat: 39.0489, lon: -94.4839 },
+  "Lincoln Financial Field": { lat: 39.9008, lon: -75.1675 },
+  "Gillette Stadium":        { lat: 42.0909, lon: -71.2643 },
+  "Hard Rock Stadium":       { lat: 25.9580, lon: -80.2389 },
+  "NRG Stadium":             { lat: 29.6847, lon: -95.4107 },
+  "Lumen Field":             { lat: 47.5952, lon: -122.3316 },
+  "BC Place":                { lat: 49.2767, lon: -123.1118 },
+  "BMO Field":               { lat: 43.6333, lon: -79.4186 },
+  "Estadio Azteca":          { lat: 19.3029, lon: -99.1505 },
+  "Estadio BBVA":            { lat: 25.6694, lon: -100.2463 },
+  "Estadio Akron":           { lat: 20.6692, lon: -103.4073 },
+};
+
+function lookupVenueCoords(venue: string | null) {
+  if (!venue) return null;
+  const lower = venue.toLowerCase();
+  for (const [key, val] of Object.entries(VENUE_COORDS)) {
+    if (lower.includes(key.toLowerCase())) return val;
+  }
+  return null;
+}
+
+function wmoEmoji(code: number): string {
+  if (code === 0) return "☀️";
+  if (code <= 2) return "🌤️";
+  if (code === 3) return "☁️";
+  if (code <= 48) return "🌫️";
+  if (code <= 55) return "🌦️";
+  if (code <= 67) return "🌧️";
+  if (code <= 77) return "❄️";
+  if (code <= 82) return "🌧️";
+  if (code <= 99) return "⛈️";
+  return "🌡️";
+}
+
+function wmoDescription(code: number): string {
+  if (code === 0) return "Clear";
+  if (code === 1) return "Mostly clear";
+  if (code === 2) return "Partly cloudy";
+  if (code === 3) return "Overcast";
+  if (code <= 48) return "Foggy";
+  if (code === 51) return "Light drizzle";
+  if (code === 53) return "Drizzle";
+  if (code === 55) return "Heavy drizzle";
+  if (code === 61) return "Light rain";
+  if (code === 63) return "Rain";
+  if (code === 65) return "Heavy rain";
+  if (code <= 67) return "Freezing rain";
+  if (code === 71) return "Light snow";
+  if (code === 73) return "Snow";
+  if (code <= 77) return "Heavy snow";
+  if (code <= 82) return "Rain showers";
+  return "Thunderstorm";
+}
+
+interface WeatherNow {
+  temp: number;
+  description: string;
+  emoji: string;
+  windMph: number;
+}
+
+async function fetchWeatherAt(lat: number, lon: number): Promise<WeatherNow | null> {
+  try {
+    const url =
+      `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,weathercode,windspeed_10m` +
+      `&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto`;
+    const res = await fetch(url, { next: { revalidate: 300 } });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      current: { temperature_2m: number; weathercode: number; windspeed_10m: number };
+    };
+    return {
+      temp: Math.round(json.current.temperature_2m),
+      description: wmoDescription(json.current.weathercode),
+      emoji: wmoEmoji(json.current.weathercode),
+      windMph: Math.round(json.current.windspeed_10m),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default async function MatchDetailPage({
   params,
 }: {
@@ -165,6 +257,9 @@ export default async function MatchDetailPage({
 
   const kickoffStr = fmtDateTime(match.matchDate?.toISOString());
 
+  const venueCoords = match.live ? lookupVenueCoords(match.venue) : null;
+  const weather = venueCoords ? await fetchWeatherAt(venueCoords.lat, venueCoords.lon) : null;
+
   return (
     <main className="page">
       <div className="wrap" style={{ maxWidth: 700 }}>
@@ -278,6 +373,14 @@ export default async function MatchDetailPage({
               <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-faint)", width: 80, flexShrink: 0 }}>Venue</span>
                 <span style={{ fontSize: 14, color: "var(--ink)" }}>{match.venue}</span>
+              </div>
+            )}
+            {weather && (
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-faint)", width: 80, flexShrink: 0 }}>Weather</span>
+                <span style={{ fontSize: 14, color: "var(--ink)" }}>
+                  {weather.emoji} {weather.temp}°F &middot; {weather.description} &middot; {weather.windMph} mph wind
+                </span>
               </div>
             )}
             <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
