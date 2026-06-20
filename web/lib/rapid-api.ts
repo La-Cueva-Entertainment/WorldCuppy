@@ -136,7 +136,7 @@ export async function fetchVenuesFromRapidApi(): Promise<RapidVenueSyncResult> {
     const awayTla = fix.awayTeam?.code?.toLowerCase();
     if (!homeTla || !awayTla) continue;
 
-    const label = venueName;
+    const label = fix.city ? `${venueName}, ${fix.city}` : venueName;
     venues.set(`${homeTla}:${awayTla}`, label);
     venues.set(`${awayTla}:${homeTla}`, label);
   }
