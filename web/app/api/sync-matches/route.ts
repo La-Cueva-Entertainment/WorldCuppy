@@ -69,7 +69,8 @@ export async function POST() {
         played: m.played,
         live: m.live,
         matchDate: m.matchDate,
-        venue: m.venue,
+        // Only overwrite venue if the source provides one — preserves venue-sync data
+        ...(m.venue !== null && { venue: m.venue }),
       },
     });
     upserted++;

@@ -51,7 +51,7 @@ export function SyncVenuesButton() {
         disabled={state === "loading"}
         className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-sky-600 px-3 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
       >
-        {state === "loading" ? "Syncing…" : "⟳ Sync Venues (API-Football)"}
+        {state === "loading" ? "Syncing…" : "⟳ Sync Venues"}
       </button>
       {result && (
         <span className={`max-w-xs whitespace-pre-wrap text-right text-[11px] ${state === "error" ? "text-rose-400" : "text-emerald-400"}`}>
