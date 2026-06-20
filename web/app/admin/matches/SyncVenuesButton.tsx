@@ -16,8 +16,8 @@ export function SyncVenuesButton() {
         total?: number;
         fixtureCount?: number;
         venueCount?: number;
+        source?: string;
         requestsRemaining?: number | null;
-        unmatchedApiNames?: string[];
         unmatchedDbKeys?: string[];
         error?: string;
       };
@@ -27,17 +27,15 @@ export function SyncVenuesButton() {
         return;
       }
       setState(data.updated === 0 ? "error" : "done");
+      const src = data.source ? ` via ${data.source}` : "";
       const rem = data.requestsRemaining != null ? ` · ${data.requestsRemaining} API calls left today` : "";
       if (data.updated === 0) {
-        const apiNames = data.unmatchedApiNames?.length
-          ? `\nAPI names sample: ${data.unmatchedApiNames.slice(0, 3).join(", ")}`
-          : "";
         const dbKeys = data.unmatchedDbKeys?.length
           ? `\nDB keys sample: ${data.unmatchedDbKeys.slice(0, 3).join(", ")}`
           : "";
-        setResult(`0 updated — ${data.fixtureCount ?? 0} fixtures, ${data.venueCount ?? 0} venues mapped${rem}${apiNames}${dbKeys}`);
+        setResult(`0 updated — ${data.fixtureCount ?? 0} fixtures, ${data.venueCount ?? 0} venues mapped${src}${rem}${dbKeys}`);
       } else {
-        setResult(`Updated ${data.updated}/${data.total} matches from ${data.fixtureCount} fixtures${rem}`);
+        setResult(`Updated ${data.updated}/${data.total} matches from ${data.fixtureCount} fixtures${src}${rem}`);
         setTimeout(() => window.location.reload(), 1500);
       }
     } catch {

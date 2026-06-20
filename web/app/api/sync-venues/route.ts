@@ -3,7 +3,9 @@ import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { fetchVenuesFromRapidApi } from "@/lib/rapid-api";
 import { fetchVenuesFromApiFootball } from "@/lib/api-football";
+import { fetchVenuesFromFootballData } from "@/lib/football-data";
 import { isSiteOwner } from "@/lib/siteOwner";
 
 export async function POST() {
@@ -19,16 +21,55 @@ export async function POST() {
     if (!user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const result = await fetchVenuesFromApiFootball();
+  let venues: Map<string, string> | null = null;
+  let fixtureCount = 0;
+  let venueCount = 0;
+  let requestsRemaining: number | null = null;
+  let source = "";
 
-  if (!result.ok) {
-    if (result.reason === "no_token")
-      return NextResponse.json({ error: "API_FOOTBALL_TOKEN not configured" }, { status: 503 });
-    if (result.reason === "rate_limited")
+  // --- Attempt 1: RapidAPI FIFA feed (venue data for all 104 fixtures) ---
+  const rapidResult = await fetchVenuesFromRapidApi();
+  if (rapidResult.ok && rapidResult.venueCount > 0) {
+    venues = rapidResult.venues;
+    fixtureCount = rapidResult.fixtureCount;
+    venueCount = rapidResult.venueCount;
+    source = "FIFA/RapidAPI";
+  }
+
+  // --- Attempt 2: football-data.org (free, no quota concerns) ---
+  if (!venues || venueCount === 0) {
+    const fdResult = await fetchVenuesFromFootballData();
+    if (fdResult.ok && fdResult.venueCount > 0) {
+      venues = fdResult.venues;
+      fixtureCount = fdResult.matchCount;
+      venueCount = fdResult.venueCount;
+      source = "football-data.org";
+    }
+  }
+
+  // --- Attempt 3: API-Football (paid plan) ---
+  if (!venues || venueCount === 0) {
+    const afResult = await fetchVenuesFromApiFootball();
+    if (afResult.ok && afResult.venueCount > 0) {
+      venues = afResult.venues;
+      fixtureCount = afResult.fixtureCount;
+      venueCount = afResult.venueCount;
+      requestsRemaining = afResult.requestsRemaining;
+      source = "api-football.com";
+    } else if (afResult.ok === false && afResult.reason === "rate_limited") {
       return NextResponse.json({ error: "Rate limited — wait at least 60s between syncs" }, { status: 429 });
-    if (result.reason === "api_errors")
-      return NextResponse.json({ error: `API-Football error: ${result.errors}` }, { status: 502 });
-    return NextResponse.json({ error: `API error ${result.status}`, body: result.body }, { status: 502 });
+    }
+  }
+
+  if (!venues || venueCount === 0) {
+    return NextResponse.json({
+      updated: 0,
+      total: 0,
+      fixtureCount: 0,
+      venueCount: 0,
+      source: "none",
+      error: "No venue data available from any source",
+    });
   }
 
   // Find the active/draft tournament
@@ -39,7 +80,7 @@ export async function POST() {
   });
 
   if (!tournament) {
-    return NextResponse.json({ updated: 0, reason: "no_active_tournament", fixtureCount: result.fixtureCount });
+    return NextResponse.json({ updated: 0, reason: "no_active_tournament", fixtureCount });
   }
 
   const matches = await prisma.match.findMany({
@@ -51,7 +92,7 @@ export async function POST() {
   const missed: string[] = [];
   for (const match of matches) {
     const key = `${match.homeTeam}:${match.awayTeam}`;
-    const venue = result.venues.get(key);
+    const venue = venues.get(key);
     if (venue) {
       await prisma.match.update({ where: { id: match.id }, data: { venue } });
       updated++;
@@ -63,11 +104,100 @@ export async function POST() {
   return NextResponse.json({
     updated,
     total: matches.length,
-    fixtureCount: result.fixtureCount,
-    venueCount: result.venueCount,
-    requestsRemaining: result.requestsRemaining,
-    // Diagnostics — show in button tooltip if updated=0
-    unmatchedApiNames: result.unmatchedNames.slice(0, 10),
+    fixtureCount,
+    venueCount,
+    source,
+    requestsRemaining,
+    unmatchedDbKeys: missed.slice(0, 10),
+  });
+}
+
+export async function POST() {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Require admin or site owner — venue sync burns API quota
+  const siteOwner = isSiteOwner(session);
+  if (!siteOwner) {
+    const userId = session.user.id;
+    if (!userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+    if (!user?.isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // --- Attempt 1: football-data.org (no quota concerns, already used for match sync) ---
+  let venues: Map<string, string> | null = null;
+  let fixtureCount = 0;
+  let venueCount = 0;
+  let requestsRemaining: number | null = null;
+  let source = "football-data.org";
+
+  const fdResult = await fetchVenuesFromFootballData();
+  if (fdResult.ok && fdResult.venueCount > 0) {
+    venues = fdResult.venues;
+    fixtureCount = fdResult.matchCount;
+    venueCount = fdResult.venueCount;
+  }
+
+  // --- Attempt 2: API-Football (paid plan or if football-data.org returned no venues) ---
+  if (!venues || venueCount === 0) {
+    const afResult = await fetchVenuesFromApiFootball();
+    if (!afResult.ok) {
+      if (afResult.reason === "rate_limited")
+        return NextResponse.json({ error: "Rate limited — wait at least 60s between syncs" }, { status: 429 });
+      // API-Football not available — surface the football-data.org result (even if 0 venues)
+      if (!venues) {
+        return NextResponse.json({ error: "Both venue sources unavailable" }, { status: 503 });
+      }
+    } else if (afResult.venueCount > 0) {
+      venues = afResult.venues;
+      fixtureCount = afResult.fixtureCount;
+      venueCount = afResult.venueCount;
+      requestsRemaining = afResult.requestsRemaining;
+      source = "api-football.com";
+    }
+  }
+
+  if (!venues) {
+    return NextResponse.json({ error: "Both venue sources unavailable" }, { status: 503 });
+  }
+
+  // Find the active/draft tournament
+  const tournament = await prisma.tournament.findFirst({
+    where: { status: { in: ["draft", "active"] } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+
+  if (!tournament) {
+    return NextResponse.json({ updated: 0, reason: "no_active_tournament", fixtureCount });
+  }
+
+  const matches = await prisma.match.findMany({
+    where: { tournamentId: tournament.id },
+    select: { id: true, homeTeam: true, awayTeam: true },
+  });
+
+  let updated = 0;
+  const missed: string[] = [];
+  for (const match of matches) {
+    const key = `${match.homeTeam}:${match.awayTeam}`;
+    const venue = venues.get(key);
+    if (venue) {
+      await prisma.match.update({ where: { id: match.id }, data: { venue } });
+      updated++;
+    } else {
+      missed.push(key);
+    }
+  }
+
+  return NextResponse.json({
+    updated,
+    total: matches.length,
+    fixtureCount,
+    venueCount,
+    source,
+    requestsRemaining,
     unmatchedDbKeys: missed.slice(0, 10),
   });
 }

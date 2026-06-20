@@ -143,7 +143,8 @@ export type AfVenueSyncResult =
  * Strategy (free tier only allows seasons 2022-2024 for league 1):
  *   1. Try /fixtures?league=1&season=2026  (works on paid plans)
  *   2. If blocked, fall back to /fixtures?live=all filtered for league 1
- *      (free tier friendly — captures venues for currently live WC matches)
+ *   3. If live=all returns 0 WC fixtures (no game in progress), fall back to
+ *      /fixtures?league=1&date=YYYY-MM-DD for today + tomorrow (free-tier friendly)
  */
 export async function fetchVenuesFromApiFootball(
   season = 2026
@@ -199,6 +200,31 @@ export async function fetchVenuesFromApiFootball(
         }
       }
     } catch { /* ignore — proceed with whatever data we have */ }
+  }
+
+  // --- Attempt 3: date-based fallback (free-tier, no live games in progress) ---
+  // Fetches today + tomorrow to capture all fixtures visible in the free plan.
+  if (data.results === 0) {
+    const today = new Date();
+    const dates = [0, 1].map((offset) => {
+      const d = new Date(today);
+      d.setUTCDate(d.getUTCDate() + offset);
+      return d.toISOString().slice(0, 10); // YYYY-MM-DD
+    });
+    for (const date of dates) {
+      try {
+        const dateResp = await doFetch(`/fixtures?league=${AF_WC_LEAGUE}&date=${date}`);
+        if (dateResp.ok) {
+          const dateData = (await dateResp.json()) as AfFixtureResponse;
+          const hasResults = (dateData.response?.length ?? 0) > 0
+            && (Array.isArray(dateData.errors) || Object.keys(dateData.errors ?? {}).length === 0);
+          if (hasResults) {
+            data = dateData;
+            break;
+          }
+        }
+      } catch { /* ignore */ }
+    }
   }
 
   const fixtures = data.response ?? [];

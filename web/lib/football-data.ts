@@ -109,6 +109,37 @@ export async function fetchWorldCupMatches(season = 2026): Promise<RateLimitResu
   return { ok: true, matches, requestsRemaining: remaining };
 }
 
+export type FdVenueSyncResult =
+  | { ok: false; reason: "no_token" }
+  | { ok: false; reason: "rate_limited"; nextAllowedAt: number }
+  | { ok: false; reason: "api_error"; status: number }
+  | { ok: true; venues: Map<string, string>; matchCount: number; venueCount: number };
+
+/**
+ * Builds a homeTla:awayTla → venue map from the football-data.org match list.
+ * Shares the same rate-limiter as fetchWorldCupMatches (7.5 s minimum gap).
+ * Uses 1 API request out of the 10/minute free quota.
+ */
+export async function fetchVenuesFromFootballData(season = 2026): Promise<FdVenueSyncResult> {
+  const result = await fetchWorldCupMatches(season);
+  if (!result.ok) return result;
+
+  const venues = new Map<string, string>();
+  for (const m of result.matches) {
+    if (!m.homeTeam || !m.awayTeam || !m.venue) continue;
+    const key = `${m.homeTeam}:${m.awayTeam}`;
+    venues.set(key, m.venue);
+    venues.set(`${m.awayTeam}:${m.homeTeam}`, m.venue);
+  }
+
+  return {
+    ok: true,
+    venues,
+    matchCount: result.matches.length,
+    venueCount: venues.size / 2,
+  };
+}
+
 // Raw types from football-data.org v4
 interface ApiRawMatch {
   id: number;

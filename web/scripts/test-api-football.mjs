@@ -87,10 +87,30 @@ if (fixtures.results > 0) {
     console.log(`  Live WC fixtures right now: ${wcLive.length} (total live: ${live.results})`);
     if (wcLive.length > 0) {
       const f = wcLive[0];
-      console.log("  ✓  Fallback works! Sample:");
+      console.log("  ✓  Live fallback works! Sample:");
       console.log("    ", f.teams.home.name, "vs", f.teams.away.name, "@", f.fixture.venue?.name);
     } else {
-      console.log("  No WC matches live right now — try again during a match.");
-      console.log("  The sync button will auto-populate venues when matches are live.");
+      console.log("  No WC matches live right now. Trying date-based fallback...");
+
+      const today = new Date().toISOString().slice(0, 10);
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      for (const date of [today, tomorrow]) {
+        console.log(`\n── Date fallback: league=1&date=${date} ────────────────`);
+        const dated = await get(`/fixtures?league=1&date=${date}`);
+        const hasErrors = !Array.isArray(dated.errors) && typeof dated.errors === "object" && Object.keys(dated.errors ?? {}).length > 0;
+        if (hasErrors) {
+          console.error("  ❌  Plan error:", JSON.stringify(dated.errors));
+          continue;
+        }
+        console.log(`  fixture count: ${dated.results}`);
+        if (dated.results > 0) {
+          const f = dated.response[0];
+          console.log("  ✓  Date fallback works! Sample:");
+          console.log("    ", f.teams.home.name, "vs", f.teams.away.name, "@", f.fixture.venue?.name, "/", f.fixture.venue?.city);
+          const withVenue = dated.response.filter(f => f.fixture.venue?.name);
+          console.log(`  fixtures with venue data: ${withVenue.length}/${dated.results}`);
+          break;
+        }
+      }
     }
   }
