@@ -97,6 +97,7 @@ model Match {
   awayScore     Int?
   penaltyWinner String?   // team code - set when knockout ends on pens
   played        Boolean   @default(false)
+  live          Boolean   @default(false)  // true while match is in progress (IN_PLAY / PAUSED)
   matchDate     DateTime?
   venue         String?
   createdAt     DateTime  @default(now())

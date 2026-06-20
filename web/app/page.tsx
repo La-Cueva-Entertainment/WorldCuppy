@@ -138,7 +138,7 @@ export default async function HomePage({
         prisma.match.findMany({
           where: { tournamentId: tournament.id, matchDate: { not: null } },
           orderBy: { matchDate: "asc" },
-          select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, matchDate: true, venue: true },
+          select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, live: true, matchDate: true, venue: true },
         }),
         prisma.lineupPick.findMany({
           where: { tournamentId: tournament.id },
@@ -373,6 +373,7 @@ export default async function HomePage({
                     const homeWon = m.played && ((m.homeScore ?? 0) > (m.awayScore ?? 0) || m.penaltyWinner === m.homeTeam);
                     const awayWon = m.played && ((m.awayScore ?? 0) > (m.homeScore ?? 0) || m.penaltyWinner === m.awayTeam);
                     const kickoff = fmtTime(m.matchDate?.toISOString());
+                    const showScore = m.played || m.live || (m.homeScore !== null && m.awayScore !== null);
 
                     const mr: MatchResult = {
                       stage: m.stage as MatchResult["stage"],
@@ -410,6 +411,8 @@ export default async function HomePage({
                           <span className="kicker">{STAGE_LABELS[m.stage] ?? m.stage}{m.groupName ? ` · Grp ${m.groupName}` : ""}</span>
                           {m.played
                             ? <span className="badge grass" style={{ height: "20px" }}>Final</span>
+                            : m.live
+                            ? <span className="badge hot" style={{ height: "20px" }}><span className="live-dot" style={{ marginRight: 4 }}></span>Live</span>
                             : <span className="tag-soft" style={{ fontWeight: 700 }}>{kickoff ?? ""}</span>
                           }
                         </div>
@@ -417,14 +420,14 @@ export default async function HomePage({
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 0", opacity: m.played && !homeWon ? .5 : 1 }}>
                           <CountryFlag code={m.homeTeam} label={TEAMS_BY_CODE.get(m.homeTeam)?.name ?? m.homeTeam} className="fi-rect flag-lg" />
                           <span style={{ fontWeight: 700, fontSize: "15px", flex: 1 }}>{TEAMS_BY_CODE.get(m.homeTeam)?.name ?? m.homeTeam}</span>
-                          {m.played && <span className="mono" style={{ fontWeight: 700, fontSize: "18px" }}>{m.homeScore}</span>}
+                          {showScore && <span className="mono" style={{ fontWeight: 700, fontSize: "18px", color: m.live ? "var(--hot)" : "inherit" }}>{m.homeScore ?? 0}</span>}
                         </div>
-                        {!m.played && <div className="faint" style={{ fontSize: "13px", fontWeight: 600, paddingLeft: "40px" }}>vs</div>}
+                        {!showScore && <div className="faint" style={{ fontSize: "13px", fontWeight: 600, paddingLeft: "40px" }}>vs</div>}
                         {/* Away team */}
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 0", opacity: m.played && !awayWon ? .5 : 1 }}>
                           <CountryFlag code={m.awayTeam} label={TEAMS_BY_CODE.get(m.awayTeam)?.name ?? m.awayTeam} className="fi-rect flag-lg" />
                           <span style={{ fontWeight: 700, fontSize: "15px", flex: 1 }}>{TEAMS_BY_CODE.get(m.awayTeam)?.name ?? m.awayTeam}</span>
-                          {m.played && <span className="mono" style={{ fontWeight: 700, fontSize: "18px" }}>{m.awayScore}</span>}
+                          {showScore && <span className="mono" style={{ fontWeight: 700, fontSize: "18px", color: m.live ? "var(--hot)" : "inherit" }}>{m.awayScore ?? 0}</span>}
                         </div>
                         {m.penaltyWinner && <div style={{ fontSize: "11px", color: "var(--gold-deep)", fontWeight: 600, paddingLeft: "40px" }}>pen</div>}
                         {payouts.length > 0 && (

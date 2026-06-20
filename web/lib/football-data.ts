@@ -31,6 +31,7 @@ export interface ApiMatch {
   awayScore: number | null;
   penaltyWinner: string | null;
   played: boolean;
+  live: boolean;
   matchDate: Date | null;
   venue: string | null;
 }
@@ -83,6 +84,7 @@ export async function fetchWorldCupMatches(season = 2026): Promise<RateLimitResu
     const awayScore = ft?.away ?? null;
 
     const played = m.status === "FINISHED";
+    const live = m.status === "IN_PLAY" || m.status === "PAUSED" || m.status === "HALFTIME";
     let penaltyWinner: string | null = null;
     if (played && m.score?.duration === "PENALTY_SHOOTOUT") {
       penaltyWinner = m.score.winner === "HOME_TEAM" ? homeTla : m.score.winner === "AWAY_TEAM" ? awayTla : null;
@@ -98,6 +100,7 @@ export async function fetchWorldCupMatches(season = 2026): Promise<RateLimitResu
       awayScore,
       penaltyWinner,
       played,
+      live,
       matchDate: m.utcDate ? new Date(m.utcDate) : null,
       venue: m.venue ?? null,
     };
@@ -110,7 +113,7 @@ export async function fetchWorldCupMatches(season = 2026): Promise<RateLimitResu
 interface ApiRawMatch {
   id: number;
   utcDate: string;
-  status: string;
+  status: string; // SCHEDULED | TIMED | IN_PLAY | PAUSED | HALFTIME | FINISHED | ...
   stage: string;
   group: string | null;
   venue: string | null;

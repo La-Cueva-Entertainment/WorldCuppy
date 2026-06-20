@@ -61,6 +61,7 @@ export default async function MatchDetailPage({
       awayScore: true,
       penaltyWinner: true,
       played: true,
+      live: true,
       matchDate: true,
       venue: true,
       tournamentId: true,
@@ -120,6 +121,7 @@ export default async function MatchDetailPage({
     match.played &&
     ((match.awayScore ?? 0) > (match.homeScore ?? 0) ||
       match.penaltyWinner === match.awayTeam);
+  const showScore = match.played || match.live || (match.homeScore !== null && match.awayScore !== null);
 
   const mr: MatchResult = {
     stage: match.stage as MatchResult["stage"],
@@ -141,9 +143,11 @@ export default async function MatchDetailPage({
     let earned = 0;
     let potential = 0;
 
-    if (match.played) {
+    if (match.played || match.live) {
+      // Played or live: show actual earnings from current score
       earned = matchEarningsCents(mr, homeOwns, awayOwns, payoutRules);
     } else {
+      // Upcoming: show potential if-win
       const homeWinResult = { ...mr, homeScore: 1, awayScore: 0 };
       const awayWinResult = { ...mr, homeScore: 0, awayScore: 1 };
       const homeCents = homeOwns
@@ -189,6 +193,8 @@ export default async function MatchDetailPage({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             {match.played ? (
               <span className="badge grass">Final</span>
+            ) : match.live ? (
+              <span className="badge hot"><span className="live-dot" style={{ marginRight: 5 }}></span>Live now</span>
             ) : (
               <span className="tag-soft" style={{ fontWeight: 700 }}>
                 {kickoffStr ?? "Kickoff TBD"}
@@ -218,11 +224,16 @@ export default async function MatchDetailPage({
 
             {/* Score */}
             <div style={{ textAlign: "center" }}>
-              {match.played ? (
+              {showScore ? (
                 <div>
-                  <div className="mono" style={{ fontWeight: 800, fontSize: "clamp(36px,6vw,52px)", letterSpacing: "-.02em" }}>
-                    {match.homeScore}<span style={{ color: "var(--ink-faint)", margin: "0 4px" }}>–</span>{match.awayScore}
+                  <div className="mono" style={{ fontWeight: 800, fontSize: "clamp(36px,6vw,52px)", letterSpacing: "-.02em", color: match.live ? "var(--hot)" : "inherit" }}>
+                    {match.homeScore ?? 0}<span style={{ color: "var(--ink-faint)", margin: "0 4px" }}>–</span>{match.awayScore ?? 0}
                   </div>
+                  {match.live && (
+                    <div style={{ fontSize: 11, color: "var(--hot)", fontWeight: 700, marginTop: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                      <span className="live-dot"></span> In progress
+                    </div>
+                  )}
                   {match.penaltyWinner && (
                     <div style={{ fontSize: 11, color: "var(--gold-deep)", fontWeight: 700, marginTop: 4 }}>
                       ({match.penaltyWinner === match.homeTeam
@@ -278,7 +289,9 @@ export default async function MatchDetailPage({
             </div>
             <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-faint)", width: 80, flexShrink: 0 }}>Status</span>
-              <span style={{ fontSize: 14, color: "var(--ink)" }}>{match.played ? "Final" : "Upcoming"}</span>
+              <span style={{ fontSize: 14, color: "var(--ink)" }}>
+                {match.played ? "Final" : match.live ? "In progress" : "Upcoming"}
+              </span>
             </div>
           </div>
         </section>
@@ -306,7 +319,7 @@ export default async function MatchDetailPage({
                     </div>
                   </div>
                   <div className="money pos" style={{ fontSize: 16, fontWeight: 800 }}>
-                    {match.played
+                    {(match.played || match.live)
                       ? s.earned > 0 ? `+${formatDollars(s.earned)}` : "—"
                       : s.potential > 0 ? `+${formatDollars(s.potential)}` : "—"}
                   </div>
@@ -317,7 +330,7 @@ export default async function MatchDetailPage({
         )}
 
         {/* Payout explanation for upcoming match */}
-        {!match.played && (
+        {!match.played && !match.live && (
           <section className="card card-pad" style={{ marginBottom: 20, background: "var(--surface-2)" }}>
             <div style={{ fontSize: 13, color: "var(--ink-soft)", lineHeight: 1.6 }}>
               <strong>How earnings work:</strong> Stakes shown are the base win earnings for this stage. Actual earnings also include goal difference bonuses
