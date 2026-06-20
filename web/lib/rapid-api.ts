@@ -16,7 +16,48 @@ const RAPID_KEY = process.env.RAPIDAPI_KEY ?? "";
 let lastCallAt = 0;
 const MIN_CALL_GAP_MS = 10_000;
 
-// ─── Raw API types ──────────────────────────────────────────────────────────
+// ─── City → real venue name ─────────────────────────────────────────────────
+// The FIFA feed via RapidAPI returns fake "<City> Stadium" venue strings.
+// Map the city field to the actual 2026 WC stadium name instead.
+const CITY_TO_VENUE: Record<string, string> = {
+  "mexico city":           "Estadio Azteca",
+  "guadalajara":           "Estadio Akron",
+  "monterrey":             "Estadio BBVA",
+  "toronto":               "BMO Field",
+  "vancouver":             "BC Place",
+  "houston":               "NRG Stadium",
+  "dallas":                "AT&T Stadium",
+  "arlington":             "AT&T Stadium",
+  "kansas city":           "Arrowhead Stadium",
+  "seattle":               "Lumen Field",
+  "san francisco bay area":"Levi's Stadium",
+  "santa clara":           "Levi's Stadium",
+  "san francisco":         "Levi's Stadium",
+  "los angeles":           "SoFi Stadium",
+  "inglewood":             "SoFi Stadium",
+  "pasadena":              "Rose Bowl",
+  "new jersey":            "MetLife Stadium",
+  "east rutherford":       "MetLife Stadium",
+  "new york":              "MetLife Stadium",
+  "philadelphia":          "Lincoln Financial Field",
+  "foxborough":            "Gillette Stadium",
+  "boston":                "Gillette Stadium",
+  "miami":                 "Hard Rock Stadium",
+  "miami gardens":         "Hard Rock Stadium",
+  "atlanta":               "Mercedes-Benz Stadium",
+};
+
+function resolveVenue(rawVenue: string | null, city: string | null): string | null {
+  if (city) {
+    const mapped = CITY_TO_VENUE[city.toLowerCase().trim()];
+    if (mapped) return mapped;
+  }
+  // Fall back to raw venue only if it doesn't look fabricated ("<City> Stadium")
+  if (rawVenue && city && rawVenue.toLowerCase() !== `${city.toLowerCase()} stadium`) {
+    return rawVenue;
+  }
+  return null;
+}
 interface RapidTeam {
   name: string;
   code: string;
@@ -88,14 +129,14 @@ export async function fetchVenuesFromRapidApi(): Promise<RapidVenueSyncResult> {
   const venues = new Map<string, string>();
 
   for (const fix of fixtures) {
-    const venueName = fix.venue;
+    const venueName = resolveVenue(fix.venue, fix.city);
     if (!venueName) continue;
 
     const homeTla = fix.homeTeam?.code?.toLowerCase();
     const awayTla = fix.awayTeam?.code?.toLowerCase();
     if (!homeTla || !awayTla) continue;
 
-    const label = fix.city ? `${venueName}, ${fix.city}` : venueName;
+    const label = venueName;
     venues.set(`${homeTla}:${awayTla}`, label);
     venues.set(`${awayTla}:${homeTla}`, label);
   }

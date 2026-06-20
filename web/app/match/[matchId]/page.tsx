@@ -257,7 +257,12 @@ export default async function MatchDetailPage({
 
   const kickoffStr = fmtDateTime(match.matchDate?.toISOString());
 
-  const venueCoords = match.live ? lookupVenueCoords(match.venue) : null;
+  const showWeather =
+    match.live ||
+    (!match.played &&
+      match.matchDate != null &&
+      match.matchDate.getTime() - Date.now() <= 2 * 60 * 60 * 1000);
+  const venueCoords = showWeather ? lookupVenueCoords(match.venue) : null;
   const weather = venueCoords ? await fetchWeatherAt(venueCoords.lat, venueCoords.lon) : null;
 
   return (
@@ -377,7 +382,9 @@ export default async function MatchDetailPage({
             )}
             {weather && (
               <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-faint)", width: 80, flexShrink: 0 }}>Weather</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-faint)", width: 80, flexShrink: 0 }}>
+                  {match.live ? "Weather" : "Forecast"}
+                </span>
                 <span style={{ fontSize: 14, color: "var(--ink)" }}>
                   {weather.emoji} {weather.temp}°F &middot; {weather.description} &middot; {weather.windMph} mph wind
                 </span>
