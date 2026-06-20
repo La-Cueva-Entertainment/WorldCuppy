@@ -63,7 +63,7 @@ export default async function AdminMatchesPage({
     ? await prisma.match.findMany({
         where: { tournamentId: selectedTournament.id },
         orderBy: [{ matchDate: "asc" }, { createdAt: "asc" }],
-        select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, matchDate: true },
+        select: { id: true, stage: true, groupName: true, homeTeam: true, awayTeam: true, homeScore: true, awayScore: true, penaltyWinner: true, played: true, matchDate: true, venue: true },
       })
     : [];
 
@@ -74,7 +74,7 @@ export default async function AdminMatchesPage({
   startOfYesterday.setDate(startOfYesterday.getDate() - 1);
   startOfYesterday.setHours(0, 0, 0, 0);
   const pastMatches = matches.filter((m) => !m.matchDate || m.matchDate <= endOfToday);
-  const upcomingCount = matches.length - pastMatches.length;
+  const upcomingMatches = matches.filter((m) => m.matchDate && m.matchDate > endOfToday);
 
   const redirectBase = selectedTournament
     ? `/admin/matches?tournamentId=${selectedTournament.id}`
@@ -105,12 +105,23 @@ export default async function AdminMatchesPage({
     const homeScore = Number(formData.get("homeScore") ?? 0);
     const awayScore = Number(formData.get("awayScore") ?? 0);
     const penaltyWinner = String(formData.get("penaltyWinner") ?? "").trim() || null;
+    const venue = String(formData.get("venue") ?? "").trim() || null;
     if (!id) redirect(`${redirectBase}&error=Missing+id`);
     await prisma.match.update({
       where: { id },
-      data: { homeScore, awayScore, penaltyWinner, played: true },
+      data: { homeScore, awayScore, penaltyWinner, played: true, venue },
     });
     redirect(`${redirectBase}&msg=Result+saved`);
+  }
+
+  async function updateVenueAction(formData: FormData) {
+    "use server";
+    await requireAdmin();
+    const id = String(formData.get("id") ?? "").trim();
+    const venue = String(formData.get("venue") ?? "").trim() || null;
+    if (!id) redirect(redirectBase);
+    await prisma.match.update({ where: { id }, data: { venue } });
+    redirect(`${redirectBase}&msg=Venue+saved`);
   }
 
   async function deleteMatchAction(formData: FormData) {
@@ -207,7 +218,7 @@ export default async function AdminMatchesPage({
               </h2>
               <span className="font-normal normal-case text-xs text-zinc-600">
                 {pastMatches.length} past match{pastMatches.length !== 1 ? "es" : ""}
-                {upcomingCount > 0 && ` · ${upcomingCount} upcoming (not shown)`}
+                {upcomingMatches.length > 0 && ` · ${upcomingMatches.length} upcoming`}
               </span>
             </div>
             <div className="space-y-2">
@@ -237,6 +248,13 @@ export default async function AdminMatchesPage({
                         <option value={m.homeTeam}>{home?.name ?? m.homeTeam} wins pens</option>
                         <option value={m.awayTeam}>{away?.name ?? m.awayTeam} wins pens</option>
                       </select>
+                      <input
+                        type="text"
+                        name="venue"
+                        placeholder="Venue (e.g. MetLife Stadium)"
+                        defaultValue={m.venue ?? ""}
+                        className="h-8 min-w-[10rem] flex-1 rounded-lg border border-white/10 bg-zinc-800 px-3 text-xs text-white outline-none placeholder:text-zinc-600"
+                      />
                       <button type="submit" className="h-8 rounded-lg bg-emerald-600 px-3 text-xs font-medium text-white hover:bg-emerald-700">Save</button>
                     </form>
                     <form action={deleteMatchAction} className="mt-1">
@@ -255,6 +273,44 @@ export default async function AdminMatchesPage({
               )}
             </div>
           </section>
+
+          {/* ── Upcoming — Venue Only ── */}
+          {upcomingMatches.length > 0 && (
+            <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-zinc-400">
+                Upcoming Matches — Set Venue
+              </h2>
+              <div className="space-y-2">
+                {upcomingMatches.map((m) => {
+                  const home = TEAMS_BY_CODE.get(m.homeTeam);
+                  const away = TEAMS_BY_CODE.get(m.awayTeam);
+                  return (
+                    <div key={m.id} className="rounded-xl bg-white/5 px-4 py-3">
+                      <div className="mb-2 flex items-center gap-2 text-xs text-zinc-500">
+                        <span className="font-semibold text-zinc-400 uppercase">{m.stage}</span>
+                        {m.groupName && <span>Group {m.groupName}</span>}
+                        {m.matchDate && <span>{new Date(m.matchDate).toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}</span>}
+                      </div>
+                      <form action={updateVenueAction} className="flex flex-wrap items-center gap-2 text-sm">
+                        <input type="hidden" name="id" value={m.id} />
+                        <span className="font-semibold text-white min-w-[6rem]">{home?.name ?? m.homeTeam}</span>
+                        <span className="text-zinc-500">vs</span>
+                        <span className="font-semibold text-white min-w-[6rem]">{away?.name ?? m.awayTeam}</span>
+                        <input
+                          type="text"
+                          name="venue"
+                          placeholder="Venue (e.g. MetLife Stadium)"
+                          defaultValue={m.venue ?? ""}
+                          className="h-8 min-w-[12rem] flex-1 rounded-lg border border-white/10 bg-zinc-800 px-3 text-xs text-white outline-none placeholder:text-zinc-600"
+                        />
+                        <button type="submit" className="h-8 rounded-lg bg-sky-600 px-3 text-xs font-medium text-white hover:bg-sky-700">Save venue</button>
+                      </form>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </>
       )}
     </main>
