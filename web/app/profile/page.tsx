@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { matchEarningsCents, totalEarningsCents, type MatchResult } from "@/lib/earnings";
+import { matchEarningsCents, totalEarningsCents, resolvePayoutRules, type MatchResult } from "@/lib/earnings";
 import ProfileContent, { type ProfileTeam, type ProfileMatchItem } from "@/components/ProfileContent";
 
 export default async function ProfilePage() {
@@ -43,7 +43,7 @@ export default async function ProfilePage() {
   const tournament = await prisma.tournament.findFirst({
     where: { status: { in: ["active", "complete"] } },
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, year: true, type: true },
+    select: { id: true, name: true, year: true, type: true, payoutRules: true },
   });
 
   if (!tournament && !upcomingTournament) {
@@ -83,6 +83,8 @@ export default async function ProfilePage() {
 
   const typed = rawMatches as RawMatch[];
 
+  const rules = resolvePayoutRules(tournament?.payoutRules as Record<string, number> | null);
+
   const matchResults: MatchResult[] = typed.map((m) => ({
     stage: m.stage as MatchResult["stage"],
     tournamentType: (tournament?.type ?? "world_cup") as MatchResult["tournamentType"],
@@ -92,11 +94,11 @@ export default async function ProfilePage() {
   }));
 
   const myTeamCodes = new Set((myPicks as { teamCode: string }[]).map((p) => p.teamCode));
-  const totalEarned = totalEarningsCents(matchResults, myTeamCodes);
+  const totalEarned = totalEarningsCents(matchResults, myTeamCodes, rules);
 
   const teams: ProfileTeam[] = (myPicks as { teamCode: string }[]).map((pick) => {
     const teamMatches = matchResults.filter((m) => m.homeTeam === pick.teamCode || m.awayTeam === pick.teamCode);
-    const earnedCents = totalEarningsCents(teamMatches, new Set([pick.teamCode]));
+    const earnedCents = totalEarningsCents(teamMatches, new Set([pick.teamCode]), rules);
 
     const matchBreakdown: ProfileMatchItem[] = teamMatches.map((m) => {
       const ownsHome = m.homeTeam === pick.teamCode;
@@ -107,7 +109,7 @@ export default async function ProfilePage() {
       return {
         stage: m.stage, oppCode,
         myScore: myScore ?? 0, oppScore: oppScore ?? 0,
-        earnedCents: matchEarningsCents(m, ownsHome, !ownsHome),
+        earnedCents: matchEarningsCents(m, ownsHome, !ownsHome, rules),
         isWin: (myScore ?? 0) > (oppScore ?? 0),
         isDraw: (myScore ?? 0) === (oppScore ?? 0),
         matchDate: raw?.matchDate ?? null,

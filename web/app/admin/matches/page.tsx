@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
 import { isSiteOwner } from "@/lib/siteOwner";
+import { SyncVenuesButton } from "./SyncVenuesButton";
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
 
@@ -136,7 +137,7 @@ export default async function AdminMatchesPage({
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
       {/* Header */}
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-6 flex flex-wrap items-center gap-4">
         <Link
           href="/admin"
           className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-xs font-medium text-zinc-300 hover:bg-white/20"
@@ -144,6 +145,9 @@ export default async function AdminMatchesPage({
           ← Admin
         </Link>
         <h1 className="text-2xl font-extrabold text-white">Edit Match Results</h1>
+        <div className="ml-auto">
+          <SyncVenuesButton />
+        </div>
       </div>
 
       {resolved.msg && (
