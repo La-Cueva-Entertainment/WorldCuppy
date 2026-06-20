@@ -94,6 +94,8 @@ function nameToTla(name: string): string | null {
 
 // ─── Raw API types ─────────────────────────────────────────────────────────
 interface AfFixtureResponse {
+  errors: Record<string, string> | string[];
+  results: number;
   response: AfFixture[];
 }
 
@@ -104,7 +106,7 @@ interface AfFixture {
     status: { short: string; elapsed: number | null };
     venue: { id: number | null; name: string | null; city: string | null };
   };
-  league: { round: string; group: string | null };
+  league: { id: number; round: string; group: string | null };
   teams: {
     home: { id: number; name: string; winner: boolean | null };
     away: { id: number; name: string; winner: boolean | null };
@@ -120,6 +122,7 @@ export type AfVenueSyncResult =
   | { ok: false; reason: "no_token" }
   | { ok: false; reason: "rate_limited" }
   | { ok: false; reason: "api_error"; status: number; body?: string }
+  | { ok: false; reason: "api_errors"; errors: string }
   | {
       ok: true;
       /** homeTla:awayTla → venue name */
@@ -136,6 +139,11 @@ export type AfVenueSyncResult =
 /**
  * Fetches all World Cup fixtures from API-Football and returns a venue lookup map.
  * Uses 1 API request. Should be called at most once per day by an admin.
+ *
+ * Strategy (free tier only allows seasons 2022-2024 for league 1):
+ *   1. Try /fixtures?league=1&season=2026  (works on paid plans)
+ *   2. If blocked, fall back to /fixtures?live=all filtered for league 1
+ *      (free tier friendly — captures venues for currently live WC matches)
  */
 export async function fetchVenuesFromApiFootball(
   season = 2026
@@ -146,15 +154,17 @@ export async function fetchVenuesFromApiFootball(
   if (now - lastCallAt < MIN_CALL_GAP_MS) return { ok: false, reason: "rate_limited" };
   lastCallAt = now;
 
+  async function doFetch(path: string): Promise<Response> {
+    return fetch(`${AF_BASE}${path}`, {
+      headers: { "x-apisports-key": AF_TOKEN },
+      cache: "no-store",
+    });
+  }
+
+  // --- Attempt 1: full season query ---
   let resp: Response;
   try {
-    resp = await fetch(
-      `${AF_BASE}/fixtures?league=${AF_WC_LEAGUE}&season=${season}`,
-      {
-        headers: { "x-apisports-key": AF_TOKEN },
-        cache: "no-store",
-      }
-    );
+    resp = await doFetch(`/fixtures?league=${AF_WC_LEAGUE}&season=${season}`);
   } catch {
     return { ok: false, reason: "api_error", status: 0, body: "Network error" };
   }
@@ -166,7 +176,31 @@ export async function fetchVenuesFromApiFootball(
     return { ok: false, reason: "api_error", status: resp.status, body };
   }
 
-  const data = (await resp.json()) as AfFixtureResponse;
+  let data = (await resp.json()) as AfFixtureResponse;
+
+  // API-Football returns plan errors in body even on HTTP 200
+  const planBlocked = !Array.isArray(data.errors)
+    && typeof data.errors === "object"
+    && Object.keys(data.errors).length > 0;
+
+  // --- Attempt 2: live fixtures fallback (free-tier friendly) ---
+  if (planBlocked || data.results === 0) {
+    try {
+      const liveResp = await doFetch(`/fixtures?live=all`);
+      if (liveResp.ok) {
+        const liveData = (await liveResp.json()) as AfFixtureResponse;
+        // Filter to World Cup (league 1) only
+        liveData.response = (liveData.response ?? []).filter(
+          (f) => f.league?.id === Number(AF_WC_LEAGUE)
+        );
+        liveData.results = liveData.response.length;
+        if (liveData.results > 0) {
+          data = liveData;
+        }
+      }
+    } catch { /* ignore — proceed with whatever data we have */ }
+  }
+
   const fixtures = data.response ?? [];
 
   const venues = new Map<string, string>();

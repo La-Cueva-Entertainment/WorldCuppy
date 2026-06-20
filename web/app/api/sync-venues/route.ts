@@ -26,6 +26,8 @@ export async function POST() {
       return NextResponse.json({ error: "API_FOOTBALL_TOKEN not configured" }, { status: 503 });
     if (result.reason === "rate_limited")
       return NextResponse.json({ error: "Rate limited — wait at least 60s between syncs" }, { status: 429 });
+    if (result.reason === "api_errors")
+      return NextResponse.json({ error: `API-Football error: ${result.errors}` }, { status: 502 });
     return NextResponse.json({ error: `API error ${result.status}`, body: result.body }, { status: 502 });
   }
 
