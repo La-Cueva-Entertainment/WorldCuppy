@@ -181,18 +181,18 @@ export default function TeamsExplorer({ teams }: Props) {
       </div>
 
       {/* Table */}
-      <div className="card tbl-scroll">
-        <table className="tbl" style={{ width: "100%" }}>
+      <div className="card teams-explorer-wrap">
+        <table className="tbl tetbl" style={{ width: "100%" }}>
           <thead>
             <tr>
               <th className="flag-cell">Flag</th>
               <th>Team</th>
               <th>Tier</th>
-              <th>Group</th>
+              <th className="te-mob-hide">Group</th>
               <th>Owner</th>
-              <th className="r">Matches</th>
+              <th className="r te-mob-hide">Matches</th>
               <th className="r">Jumps</th>
-              <th className="r">Stage</th>
+              <th className="r te-mob-hide">Stage</th>
               <th className="r">Earned</th>
             </tr>
           </thead>
@@ -209,7 +209,7 @@ export default function TeamsExplorer({ teams }: Props) {
                 <td>
                   <span className={`tier tier-${t.tier}`}>{t.tierLabel}</span>
                 </td>
-                <td>
+                <td className="te-mob-hide">
                   <span style={{ fontSize: 13, fontWeight: 600 }}>Grp {t.group}</span>
                 </td>
                 <td>
@@ -224,7 +224,7 @@ export default function TeamsExplorer({ teams }: Props) {
                     <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>Unowned</span>
                   )}
                 </td>
-                <td className="r mono" style={{ fontSize: 13 }}>
+                <td className="r mono te-mob-hide" style={{ fontSize: 13 }}>
                   {t.matchesPlayed > 0 ? `${t.wins}W ${t.draws}D` : "—"}
                 </td>
                 <td className="r">
@@ -236,7 +236,7 @@ export default function TeamsExplorer({ teams }: Props) {
                     <span style={{ color: "var(--ink-faint)", fontSize: 13 }}>—</span>
                   )}
                 </td>
-                <td className="r">
+                <td className="r te-mob-hide">
                   {t.highestStage ? (
                     <span style={{ fontSize: 12, fontWeight: 700, color: t.active ? "var(--grass-deep)" : "var(--ink-faint)" }}>
                       {STAGE_LABELS[t.highestStage] ?? t.highestStage}

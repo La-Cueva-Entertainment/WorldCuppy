@@ -571,29 +571,39 @@ export default async function DraftPage({
         <>
           {/* Status / countdown card */}
           <div className="card" style={{ padding: "20px 24px", marginBottom: 18 }}>
-            <p style={{ color: "var(--ink-soft)" }}>
-              {draftComplete
-                ? "Draft is complete! Check the standings."
-                : orderUserIds.length === 0
-                  ? "No participants enrolled yet. An admin needs to set up the draft."
-                  : "Draft has not started yet. Waiting for the scheduled time."}
-            </p>
-            {draftComplete && (
-              <Link
-                href="/draft/analysis"
-                className="btn btn-primary btn-sm"
-                style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6 }}
-              >
-                🤖 View AI Report Cards →
-              </Link>
-            )}
-            {!draftComplete && tournament.draftDate && (
-              <div style={{ marginTop: 16 }}>
-                <CountdownTimer
-                  targetISO={tournament.draftDate.toISOString()}
-                  label={`${tournament.name} ${tournament.year} Draft`}
-                />
+            {draftComplete ? (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
+                <div>
+                  <div className="kicker grass" style={{ marginBottom: 4 }}>Snake draft · Complete</div>
+                  <p style={{ color: "var(--ink-soft)", margin: 0 }}>
+                    All {maxPicks} picks made. See the results below or check the full standings.
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <Link href="/draft/analysis" className="btn btn-primary btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    🤖 AI Report Cards →
+                  </Link>
+                  <Link href="/standings" className="btn btn-ghost btn-sm">
+                    Standings →
+                  </Link>
+                </div>
               </div>
+            ) : (
+              <>
+                <p style={{ color: "var(--ink-soft)" }}>
+                  {orderUserIds.length === 0
+                    ? "No participants enrolled yet. An admin needs to set up the draft."
+                    : "Draft has not started yet. Waiting for the scheduled time."}
+                </p>
+                {tournament.draftDate && (
+                  <div style={{ marginTop: 16 }}>
+                    <CountdownTimer
+                      targetISO={tournament.draftDate.toISOString()}
+                      label={`${tournament.name} ${tournament.year} Draft`}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
 

@@ -2,31 +2,12 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 
 import TournamentView, { type TvPlayer, type TvMatch } from "@/components/TournamentView";
-import TeamsExplorer, { type TeamsExplorerTeam } from "@/components/TeamsExplorer";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TEAMS } from "@/lib/teams";
-import { totalEarningsCents, matchEarningsCents, resolvePayoutRules, type MatchResult } from "@/lib/earnings";
-import { buildDraftTiers } from "@/lib/draftTiers";
+import { totalEarningsCents, resolvePayoutRules, type MatchResult } from "@/lib/earnings";
 
 const TEAMS_BY_CODE = new Map(TEAMS.map((t) => [t.code, t]));
-
-// Build tier lookup from default tier structure
-function buildTierMap(tournamentId: string): Map<string, { num: number; label: string }> {
-  const tiers = buildDraftTiers(tournamentId);
-  const m = new Map<string, { num: number; label: string }>();
-  for (const t of tiers) {
-    for (const team of t.teams) {
-      m.set(team.code, { num: t.num, label: t.labelBase });
-    }
-  }
-  return m;
-}
-
-// Determine which stage a team has reached (highest stage they played)
-const STAGE_ORDER_RANK: Record<string, number> = {
-  group: 1, r32: 2, r16: 3, qf: 4, sf: 5, "3rd": 6, final: 7,
-};
 
 export default async function StandingsPage() {
   const session = await getServerSession(authOptions);
@@ -164,116 +145,6 @@ export default async function StandingsPage() {
     tvMatchesByStage[dbm.stage] = arr;
   }
 
-  // ── Build Teams Explorer data ──────────────────────────────────────
-  const tierMap = buildTierMap(tournament.id);
-
-  // Compute per-team stats from played matches
-  const teamStats = new Map<string, {
-    earningsCents: number;
-    jumpBonusCount: number;
-    highestStage: string | null;
-    active: boolean;
-    matchesPlayed: number;
-    wins: number;
-    draws: number;
-    goalsFor: number;
-  }>();
-
-  // Initialize all known teams
-  for (const team of TEAMS) {
-    teamStats.set(team.code, { earningsCents: 0, jumpBonusCount: 0, highestStage: null, active: true, matchesPlayed: 0, wins: 0, draws: 0, goalsFor: 0 });
-  }
-
-  // For each played match, compute per-team stats
-  for (const m of playedMatches) {
-    const homeScore = m.homeScore ?? 0;
-    const awayScore = m.awayScore ?? 0;
-    const homeWon = homeScore > awayScore || m.penaltyWinner === m.homeTeam;
-    const awayWon = awayScore > homeScore || m.penaltyWinner === m.awayTeam;
-    const draw = !homeWon && !awayWon;
-
-    const mr: MatchResult = {
-      stage: m.stage as MatchResult["stage"],
-      tournamentType: tournament.type as MatchResult["tournamentType"],
-      homeTeam: m.homeTeam, awayTeam: m.awayTeam,
-      homeScore, awayScore, penaltyWinner: m.penaltyWinner ?? null,
-    };
-
-    for (const [code, isHome] of [[m.homeTeam, true], [m.awayTeam, false]] as [string, boolean][]) {
-      const s = teamStats.get(code) ?? { earningsCents: 0, jumpBonusCount: 0, highestStage: null, active: true, matchesPlayed: 0, wins: 0, draws: 0, goalsFor: 0 };
-      s.matchesPlayed++;
-      s.goalsFor += isHome ? homeScore : awayScore;
-      if (isHome ? homeWon : awayWon) s.wins++;
-      else if (draw) s.draws++;
-
-      // Track highest stage reached
-      const stageRank = STAGE_ORDER_RANK[m.stage] ?? 0;
-      const curRank = STAGE_ORDER_RANK[s.highestStage ?? ""] ?? 0;
-      if (stageRank > curRank) s.highestStage = m.stage;
-
-      // Jump bonus: only group stage, winner must be in higher-numbered tier
-      if (m.stage === "group" && (isHome ? homeWon : awayWon)) {
-        const winnerTier = tierMap.get(code)?.num ?? 4;
-        const loserCode = isHome ? m.awayTeam : m.homeTeam;
-        const loserTier = tierMap.get(loserCode)?.num ?? 1;
-        if (winnerTier > loserTier) s.jumpBonusCount++;
-      }
-
-      // Individual team earnings (owned by anyone — just need to know the team's total)
-      s.earningsCents += matchEarningsCents(mr, isHome, !isHome, payoutRules);
-
-      teamStats.set(code, s);
-    }
-
-    // Mark eliminated teams in knockout stages (loser is out)
-    if (m.stage !== "group") {
-      const loserCode = homeWon ? m.awayTeam : m.homeTeam;
-      const ls = teamStats.get(loserCode);
-      if (ls) { ls.active = false; teamStats.set(loserCode, ls); }
-    }
-  }
-
-  // Mark all teams that haven't appeared in group stage as "active = true" (haven't started yet)
-  // (they stay at their initial active=true default)
-
-  // Build owner lookup (first owner per team)
-  const ownerByTeam = new Map<string, { userId: string; name: string; colorIdx: number }>();
-  for (const p of picks) {
-    if (!ownerByTeam.has(p.teamCode)) {
-      const idx = playerIds.indexOf(p.userId);
-      ownerByTeam.set(p.teamCode, {
-        userId: p.userId,
-        name: displayName(p.userId),
-        colorIdx: idx >= 0 ? idx % 8 : 0,
-      });
-    }
-  }
-
-  const explorerTeams: TeamsExplorerTeam[] = TEAMS.map((team) => {
-    const stats = teamStats.get(team.code) ?? { earningsCents: 0, jumpBonusCount: 0, highestStage: null, active: true, matchesPlayed: 0, wins: 0, draws: 0, goalsFor: 0 };
-    const tier = tierMap.get(team.code);
-    const owner = ownerByTeam.get(team.code);
-    return {
-      code: team.code,
-      name: team.name,
-      rank: team.rank,
-      group: team.group,
-      tier: tier?.num ?? 4,
-      tierLabel: tier?.label ?? "Long shots",
-      ownerName: owner?.name ?? null,
-      ownerUserId: owner?.userId ?? null,
-      ownerColorIdx: owner?.colorIdx ?? null,
-      earningsCents: stats.earningsCents,
-      jumpBonusCount: stats.jumpBonusCount,
-      highestStage: stats.highestStage,
-      active: stats.active,
-      matchesPlayed: stats.matchesPlayed,
-      wins: stats.wins,
-      draws: stats.draws,
-      goalsFor: stats.goalsFor,
-    };
-  });
-
   return (
     <TournamentView
       name={tournament.name}
@@ -285,7 +156,6 @@ export default async function StandingsPage() {
       players={tvPlayers}
       matchesByStage={tvMatchesByStage}
       payoutRules={payoutRules}
-      extraContent={<TeamsExplorer teams={explorerTeams} />}
     />
   );
 }

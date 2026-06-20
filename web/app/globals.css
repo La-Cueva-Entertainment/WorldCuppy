@@ -328,6 +328,14 @@ html:not(.dark) .pitch-panel {
 .tbl .r { text-align: right; }
 .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+/* Teams Explorer table */
+.teams-explorer-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--r-xl); }
+.tetbl { min-width: 640px; }
+@media (max-width: 680px) {
+  .tetbl { min-width: 420px; }
+  .te-mob-hide { display: none; }
+}
+
 /* ── Segmented control ───────────────────────────────────── */
 .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 3px; gap: 2px; }
 .seg button {
@@ -616,8 +624,8 @@ html:not(.dark) .pitch-panel {
 }
 
 @media (max-width: 680px) {
-  /* Prevent anything from blowing out the page width */
-  .draft-controls, .tbl-scroll { max-width: 100%; overflow-x: hidden; }
+  /* Prevent draft controls from blowing out the page width; tbl-scroll tables scroll themselves */
+  .draft-controls { max-width: 100%; overflow-x: hidden; }
   .teamtbl { width: 100%; }
 
   /* Controls: stacked column, seg fills width with equal buttons */
