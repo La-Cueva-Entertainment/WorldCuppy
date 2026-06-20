@@ -15,7 +15,10 @@ export function SyncVenuesButton() {
         updated?: number;
         total?: number;
         fixtureCount?: number;
+        venueCount?: number;
         requestsRemaining?: number | null;
+        unmatchedApiNames?: string[];
+        unmatchedDbKeys?: string[];
         error?: string;
       };
       if (!res.ok) {
@@ -23,11 +26,20 @@ export function SyncVenuesButton() {
         setResult(data.error ?? `Error ${res.status}`);
         return;
       }
-      setState("done");
+      setState(data.updated === 0 ? "error" : "done");
       const rem = data.requestsRemaining != null ? ` · ${data.requestsRemaining} API calls left today` : "";
-      setResult(`Updated ${data.updated}/${data.total} matches from ${data.fixtureCount} fixtures${rem}`);
-      // Reload after a moment so venue inputs refresh
-      setTimeout(() => window.location.reload(), 1500);
+      if (data.updated === 0) {
+        const apiNames = data.unmatchedApiNames?.length
+          ? `\nAPI names sample: ${data.unmatchedApiNames.slice(0, 3).join(", ")}`
+          : "";
+        const dbKeys = data.unmatchedDbKeys?.length
+          ? `\nDB keys sample: ${data.unmatchedDbKeys.slice(0, 3).join(", ")}`
+          : "";
+        setResult(`0 updated — ${data.fixtureCount ?? 0} fixtures, ${data.venueCount ?? 0} venues mapped${rem}${apiNames}${dbKeys}`);
+      } else {
+        setResult(`Updated ${data.updated}/${data.total} matches from ${data.fixtureCount} fixtures${rem}`);
+        setTimeout(() => window.location.reload(), 1500);
+      }
     } catch {
       setState("error");
       setResult("Network error");
@@ -44,7 +56,7 @@ export function SyncVenuesButton() {
         {state === "loading" ? "Syncing…" : "⟳ Sync Venues (API-Football)"}
       </button>
       {result && (
-        <span className={`text-[11px] ${state === "error" ? "text-rose-400" : "text-emerald-400"}`}>
+        <span className={`max-w-xs whitespace-pre-wrap text-right text-[11px] ${state === "error" ? "text-rose-400" : "text-emerald-400"}`}>
           {result}
         </span>
       )}

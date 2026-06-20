@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
 import { CopyButton } from "@/components/CopyButton";
 import DraftOrderPicker from "@/components/DraftOrderPicker";
+import { SyncVenuesButton } from "@/app/admin/matches/SyncVenuesButton";
 import { authOptions } from "@/lib/auth";
 import { postDraftStarted } from "@/lib/discord";
 import { activateDraft, presetDraftOrder, resetDraftOrder } from "@/lib/draft";
@@ -738,12 +739,15 @@ export default async function AdminPage({
       <section className={`mb-8 ${section}`}>
         <div className="flex items-center justify-between">
           <h2 className={sectionTitle}>Match Management</h2>
-          <Link
-            href="/admin/matches"
-            className="inline-flex h-9 items-center rounded-xl bg-sky-50 dark:bg-sky-500/15 px-4 text-sm font-semibold text-sky-700 dark:text-sky-300 ring-1 ring-sky-200 dark:ring-sky-500/30 hover:bg-sky-100 dark:hover:bg-sky-500/25"
-          >
-            Edit Match Results
-          </Link>
+          <div className="flex items-center gap-3">
+            <SyncVenuesButton />
+            <Link
+              href="/admin/matches"
+              className="inline-flex h-9 items-center rounded-xl bg-sky-50 dark:bg-sky-500/15 px-4 text-sm font-semibold text-sky-700 dark:text-sky-300 ring-1 ring-sky-200 dark:ring-sky-500/30 hover:bg-sky-100 dark:hover:bg-sky-500/25"
+            >
+              Edit Match Results
+            </Link>
+          </div>
         </div>
         {!activeTournament && (
           <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-500">No active tournament. Create and activate one to manage matches.</p>

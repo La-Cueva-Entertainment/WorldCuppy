@@ -127,6 +127,9 @@ export type AfVenueSyncResult =
       /** homeTla:awayTla → "venue name, city" */
       venueWithCity: Map<string, string>;
       fixtureCount: number;
+      venueCount: number;
+      /** Team name pairs that had a venue but couldn't be mapped to TLA codes */
+      unmatchedNames: string[];
       requestsRemaining: number | null;
     };
 
@@ -168,6 +171,7 @@ export async function fetchVenuesFromApiFootball(
 
   const venues = new Map<string, string>();
   const venueWithCity = new Map<string, string>();
+  const unmatchedNames: string[] = [];
 
   for (const fix of fixtures) {
     const venueName = fix.fixture.venue?.name;
@@ -175,13 +179,21 @@ export async function fetchVenuesFromApiFootball(
 
     const homeTla = nameToTla(fix.teams.home.name);
     const awayTla = nameToTla(fix.teams.away.name);
-    if (!homeTla || !awayTla) continue;
+
+    if (!homeTla || !awayTla) {
+      unmatchedNames.push(`${fix.teams.home.name} vs ${fix.teams.away.name}`);
+      continue;
+    }
 
     const key = `${homeTla}:${awayTla}`;
     venues.set(key, venueName);
+    // Also store the reverse so home/away ordering differences are handled
+    venues.set(`${awayTla}:${homeTla}`, venueName);
 
     const city = fix.fixture.venue?.city;
-    venueWithCity.set(key, city ? `${venueName}, ${city}` : venueName);
+    const full = city ? `${venueName}, ${city}` : venueName;
+    venueWithCity.set(key, full);
+    venueWithCity.set(`${awayTla}:${homeTla}`, full);
   }
 
   return {
@@ -189,6 +201,8 @@ export async function fetchVenuesFromApiFootball(
     venues,
     venueWithCity,
     fixtureCount: fixtures.length,
+    venueCount: venues.size / 2, // divided by 2 because we store both directions
+    unmatchedNames,
     requestsRemaining: requestsRemaining !== null ? Number(requestsRemaining) : null,
   };
 }

@@ -46,12 +46,15 @@ export async function POST() {
   });
 
   let updated = 0;
+  const missed: string[] = [];
   for (const match of matches) {
     const key = `${match.homeTeam}:${match.awayTeam}`;
     const venue = result.venues.get(key);
     if (venue) {
       await prisma.match.update({ where: { id: match.id }, data: { venue } });
       updated++;
+    } else {
+      missed.push(key);
     }
   }
 
@@ -59,6 +62,10 @@ export async function POST() {
     updated,
     total: matches.length,
     fixtureCount: result.fixtureCount,
+    venueCount: result.venueCount,
     requestsRemaining: result.requestsRemaining,
+    // Diagnostics — show in button tooltip if updated=0
+    unmatchedApiNames: result.unmatchedNames.slice(0, 10),
+    unmatchedDbKeys: missed.slice(0, 10),
   });
 }
