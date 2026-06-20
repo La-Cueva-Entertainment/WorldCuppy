@@ -384,14 +384,28 @@ export default async function HomePage({
 
                     const payouts = payoutRules ? playerIds.flatMap((uid: string) => {
                       const teams = teamsByPlayer.get(uid) ?? new Set<string>();
+                      const u = userById.get(uid);
+                      const playerName = teamNameById.get(uid) ?? u?.name ?? u?.email?.split("@")[0] ?? "?";
+                      if (!m.played) {
+                        // Upcoming match: show what each owner would earn if their team wins (1-0 scenario)
+                        const homeOwns = teams.has(m.homeTeam);
+                        const awayOwns = teams.has(m.awayTeam);
+                        if (!homeOwns && !awayOwns) return [];
+                        const homeWinResult = { ...mr, homeScore: 1, awayScore: 0 };
+                        const awayWinResult = { ...mr, homeScore: 0, awayScore: 1 };
+                        const homeCents = homeOwns ? matchEarningsCents(homeWinResult, true, false, payoutRules) : 0;
+                        const awayCents = awayOwns ? matchEarningsCents(awayWinResult, false, true, payoutRules) : 0;
+                        const cents = Math.max(homeCents, awayCents);
+                        if (cents === 0) return [];
+                        return [{ playerId: uid, playerName, colorIdx: colorOf(uid), cents }];
+                      }
                       const cents = matchEarningsCents(mr, teams.has(m.homeTeam), teams.has(m.awayTeam), payoutRules);
                       if (cents === 0) return [];
-                      const u = userById.get(uid);
-                      return [{ playerId: uid, playerName: u?.name ?? u?.email?.split("@")[0] ?? "?", colorIdx: colorOf(uid), cents }];
+                      return [{ playerId: uid, playerName, colorIdx: colorOf(uid), cents }];
                     }) : [];
 
                     return (
-                      <div key={m.id} className="card" style={{ padding: "14px 15px" }}>
+                      <Link key={m.id} href={`/match/${m.id}`} className="card" style={{ padding: "14px 15px", display: "block", textDecoration: "none", color: "inherit" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "11px" }}>
                           <span className="kicker">{STAGE_LABELS[m.stage] ?? m.stage}{m.groupName ? ` · Grp ${m.groupName}` : ""}</span>
                           {m.played
@@ -414,17 +428,24 @@ export default async function HomePage({
                         </div>
                         {m.penaltyWinner && <div style={{ fontSize: "11px", color: "var(--gold-deep)", fontWeight: 600, paddingLeft: "40px" }}>pen</div>}
                         {payouts.length > 0 && (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "11px", paddingTop: "11px", borderTop: "1px solid var(--line-soft)" }}>
-                            {payouts.map((p) => (
-                              <span key={p.playerId} className={`m-chip m${p.colorIdx}`}>
-                                <span className="mdot"></span>
-                                {p.playerName}
-                                {p.cents > 0 && <b className="mono" style={{ fontSize: "11px" }}>+{formatDollars(p.cents)}</b>}
-                              </span>
-                            ))}
+                          <div style={{ marginTop: "11px", paddingTop: "11px", borderTop: "1px solid var(--line-soft)" }}>
+                            {!m.played && (
+                              <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink-faint)", marginBottom: "6px" }}>
+                                Potential if win
+                              </div>
+                            )}
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                              {payouts.map((p) => (
+                                <span key={p.playerId} className={`m-chip m${p.colorIdx}`}>
+                                  <span className="mdot"></span>
+                                  {p.playerName}
+                                  {p.cents > 0 && <b className="mono" style={{ fontSize: "11px" }}>+{formatDollars(p.cents)}</b>}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         )}
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -449,10 +470,10 @@ export default async function HomePage({
                       <span style={{ width: "22px", fontFamily: "var(--font-archivo), Archivo, sans-serif", fontWeight: 800, color: "var(--ink-faint)", textAlign: "center", flexShrink: 0 }}>{i + 1}</span>
                       <span className={`mdot m${colorOf(s.uid)}`} style={{ flexShrink: 0 }}></span>
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ fontWeight: 700, display: "block" }}>
+                        <Link href={`/standings/player/${s.uid}`} style={{ fontWeight: 700, display: "block", textDecoration: "none", color: "inherit" }}>
                           {s.displayName}
                           {s.uid === userId && <span className="faint" style={{ fontSize: "12px", fontWeight: 400 }}> (you)</span>}
-                        </span>
+                        </Link>
                         {s.realSub && <span style={{ fontSize: "11px", color: "var(--ink-faint)", fontWeight: 400 }}>{s.realSub}</span>}
                       </span>
                       <span className="money pos">{formatDollars(s.cents)}</span>

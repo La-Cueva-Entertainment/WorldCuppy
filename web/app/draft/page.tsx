@@ -425,6 +425,25 @@ export default async function DraftPage({
 
   const draftComplete = draft?.status === "complete" || (maxPicks > 0 && currentPick >= maxPicks);
 
+  // Build tier lookup for results board
+  const tierByCode = new Map<string, { num: number; label: string; jump: string }>();
+  for (const tier of tiers) {
+    for (const team of tier.teams) {
+      tierByCode.set(team.code, { num: tier.num, label: tier.labelBase, jump: tier.jump });
+    }
+  }
+
+  // Build per-player picks in order (for results grid)
+  const picksByPlayer = new Map<string, typeof allPicks>();
+  for (const p of allPicks) {
+    const arr = picksByPlayer.get(p.userId) ?? [];
+    arr.push(p);
+    picksByPlayer.set(p.userId, arr);
+  }
+  for (const [, picks] of picksByPlayer) {
+    picks.sort((a, b) => (a.pickNumber ?? 0) - (b.pickNumber ?? 0));
+  }
+
   const recentPicks = allPicks.map((p) => {
     const team = TEAMS_BY_CODE.get(p.teamCode);
     const colorIdx = orderUserIds.indexOf(p.userId);
@@ -577,7 +596,80 @@ export default async function DraftPage({
             )}
           </div>
 
-          {/* Draft order strip + team table */}
+          {/* Draft results board (shown when complete) */}
+          {draftComplete && orderUserIds.length > 0 && (
+            <section style={{ marginBottom: 24 }}>
+              <div className="sec-head" style={{ marginBottom: 16 }}>
+                <h2 style={{ fontSize: 20 }}>Draft Results</h2>
+                <Link href="/standings" className="btn btn-primary btn-sm">Standings →</Link>
+              </div>
+
+              {/* Per-player columns */}
+              <div style={{ overflowX: "auto" }}>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${orderUserIds.length}, minmax(160px, 1fr))`, gap: 12, minWidth: orderUserIds.length * 168 }}>
+                  {orderUserIds.map((uid, idx) => {
+                    const playerPicks = picksByPlayer.get(uid) ?? [];
+                    return (
+                      <div key={uid} className="card" style={{ padding: 0, overflow: "hidden" }}>
+                        {/* Column header */}
+                        <div style={{ padding: "10px 12px", background: "var(--surface-2)", borderBottom: "1px solid var(--line-soft)", display: "flex", alignItems: "center", gap: 8 }}>
+                          <span className={`mdot m${idx % 8}`} />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {displayName(uid)}
+                            </div>
+                            {shortRealName(uid) && (
+                              <div style={{ fontSize: 11, color: "var(--ink-faint)" }}>{shortRealName(uid)}</div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Picks */}
+                        {playerPicks.map((p, pi) => {
+                          const team = TEAMS_BY_CODE.get(p.teamCode);
+                          const tier = tierByCode.get(p.teamCode);
+                          return (
+                            <div key={p.teamCode} style={{ padding: "9px 12px", borderBottom: pi < playerPicks.length - 1 ? "1px solid var(--line-soft)" : "none", display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--ink-faint)", width: 20, flexShrink: 0 }}>#{(p.pickNumber ?? pi) + 1}</span>
+                              <CountryFlag code={p.teamCode} label={team?.name ?? p.teamCode} className="fi-rect flag-sm" />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {team?.name ?? p.teamCode.toUpperCase()}
+                                </div>
+                                {tier && (
+                                  <div style={{ marginTop: 2 }}>
+                                    <span className={`tier tier-${tier.num}`} style={{ fontSize: 10 }}>{tier.label}</span>
+                                    {tier.num > 1 && (
+                                      <span style={{ fontSize: 10, color: "var(--grass-deep)", fontWeight: 700, marginLeft: 4 }}>{tier.jump}</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {playerPicks.length === 0 && (
+                          <div style={{ padding: "12px", fontSize: 13, color: "var(--ink-faint)", textAlign: "center" }}>No picks</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tier legend */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginTop: 16 }}>
+                {tiers.map((t) => (
+                  <div key={t.key} className="card" style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span className={`tier tier-${t.num}`}>{t.labelBase}</span>
+                    <div style={{ fontSize: 11, color: "var(--ink-faint)" }}>{t.rangeLabel}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: t.num > 1 ? "var(--grass-deep)" : "var(--ink-faint)" }}>{t.jump}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Draft order strip + team table (shown only while draft is not yet started) */}
           {!draftComplete && (
             <div className="draft-grid">
               {orderUserIds.length > 0 && (

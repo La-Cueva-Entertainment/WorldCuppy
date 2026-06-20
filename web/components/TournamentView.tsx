@@ -1,3 +1,5 @@
+import type React from "react";
+import Link from "next/link";
 import { CountryFlag } from "@/components/CountryFlag";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { KnockoutBracket } from "@/components/KnockoutBracket";
@@ -55,6 +57,7 @@ export interface TournamentViewProps {
   todayMatches: TvMatch[];
   matchesByStage: Partial<Record<string, TvMatch[]>>;
   payoutRules?: PayoutRules | null;
+  extraContent?: React.ReactNode;
 }
 
 const PLAYER_COLORS = [
@@ -91,7 +94,7 @@ function fmtTime(iso: string | null | undefined, includeDate = false): string | 
 
 export default function TournamentView({
   name, year, type, status, isDemo, showLiveSync, showTodayMatches = true, draftDateISO,
-  players, todayMatches, matchesByStage, payoutRules,
+  players, todayMatches, matchesByStage, payoutRules, extraContent,
 }: TournamentViewProps) {
   const hasAnyMatches = STAGE_ORDER.some((s) => (matchesByStage[s]?.length ?? 0) > 0);
   const rules = payoutRules ?? DEFAULT_PAYOUT_RULES;
@@ -222,11 +225,13 @@ export default function TournamentView({
               <div key={player.id} className={`lb-row${player.isYou ? " you" : ""}`}>
                 <div className={`lb-pos${medal ? " " + medal : ""}`}>{i + 1}</div>
                 <div>
-                  <div className="lb-name">
-                    <span className={`mdot m${player.colorIdx % 8}`} />
-                    {player.name}
-                    {player.isYou && <span className="tag-soft" style={{ fontWeight: 600 }}>you</span>}
-                  </div>
+                  <Link href={`/standings/player/${player.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                    <div className="lb-name">
+                      <span className={`mdot m${player.colorIdx % 8}`} />
+                      {player.name}
+                      {player.isYou && <span className="tag-soft" style={{ fontWeight: 600 }}>you</span>}
+                    </div>
+                  </Link>
                   <div className="lb-teams">
                     {player.teams.map((t) => (
                       <CountryFlag key={t.code} code={t.code} label={t.name} className="flag-md fi-rect" />
@@ -255,6 +260,9 @@ export default function TournamentView({
 
       {/* Full-width knockout bracket */}
       <KnockoutBracket matchesByStage={matchesByStage} />
+
+      {/* Extra content (e.g. TeamsExplorer) */}
+      {extraContent}
       </div>
     </main>
   );
